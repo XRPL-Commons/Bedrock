@@ -1,6 +1,7 @@
 package cli
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,6 +17,9 @@ var initCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE:  runInit,
 }
+
+//go:embed templates/genesis.json
+var genesisTemplate string
 
 func init() {
 	rootCmd.AddCommand(initCmd)
@@ -91,9 +95,8 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-# Update these paths to match your XRPL dependencies
-# xrpl-wasm-std = { path = "../xrpl-wasm-std" }
-# xrpl-wasm-macro = { path = "../xrpl-wasm-macro" }
+xrpl-wasm-std = { git = "https://github.com/Transia-RnD/craft.git", branch = "dangell/smart-contracts", package = "xrpl-wasm-std" }
+xrpl-wasm-macros= { git = "https://github.com/Transia-RnD/craft.git", branch = "dangell/smart-contracts", package = "xrpl-wasm-macros" }
 
 [profile.release]
 opt-level = "z"
@@ -112,7 +115,7 @@ panic = "abort"
 #[cfg(not(target_arch = "wasm32"))]
 extern crate std;
 
-use xrpl_wasm_macro::wasm_export;
+use xrpl_wasm_macros::wasm_export;
 use xrpl_wasm_std::host::trace::trace;
 
 #[wasm_export]
@@ -126,28 +129,9 @@ fn hello() -> i32 {
 		return fmt.Errorf("failed to create lib.rs: %w", err)
 	}
 
-	// Create genesis.json template (from alphanet)
-	genesisContent := `{
-  "ledger": {
-    "accepted": true,
-    "accountState": [
-      {
-        "Account": "rGWrZyQqhTp9Xu7G5Pkayo7bXjH4k4QYpf",
-        "Balance": "100000000000000000",
-        "Flags": 0,
-        "LedgerEntryType": "AccountRoot",
-        "OwnerCount": 0,
-        "Sequence": 1,
-        "index": "2B6AC232AA4C4BE41BF49D2459FA4A0347E1B543A4C92FCEE0821C0201E2E9A8"
-      }
-    ],
-    "ledger_index": "1",
-    "parent_hash": "",
-    "total_coins": "100000000000000000"
-  }
-}
-`
-	if err := os.WriteFile(filepath.Join(projectName, ".bedrock", "node-config", "genesis.json"), []byte(genesisContent), 0644); err != nil {
+	// Write embedded genesis.json template
+	genesisPath := filepath.Join(projectName, ".bedrock", "node-config", "genesis.json")
+	if err := os.WriteFile(genesisPath, []byte(genesisTemplate), 0644); err != nil {
 		return fmt.Errorf("failed to create genesis.json: %w", err)
 	}
 
