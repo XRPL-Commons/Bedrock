@@ -12,7 +12,7 @@ import (
 	"sync"
 )
 
-//go:embed modules/deploy/deploy.js modules/call/call.js modules/package.json
+//go:embed modules/deploy/deploy.js modules/call/call.js modules/faucet/faucet.js modules/package.json
 var ModulesFS embed.FS
 
 var (
@@ -75,6 +75,13 @@ func getModulesVersion() (string, error) {
 		return "", err
 	}
 	hasher.Write(callJS)
+
+	// Hash faucet.js
+	faucetJS, err := ModulesFS.ReadFile("modules/faucet/faucet.js")
+	if err != nil {
+		return "", err
+	}
+	hasher.Write(faucetJS)
 
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
@@ -177,6 +184,19 @@ func SetupModules() (string, error) {
 			callPath := filepath.Join(cache, "call.js")
 			if err := os.WriteFile(callPath, callJS, 0755); err != nil {
 				setupError = fmt.Errorf("failed to write call.js: %w", err)
+				return
+			}
+
+			// Extract faucet.js
+			faucetJS, err := ModulesFS.ReadFile("modules/faucet/faucet.js")
+			if err != nil {
+				setupError = fmt.Errorf("failed to read faucet.js: %w", err)
+				return
+			}
+
+			faucetPath := filepath.Join(cache, "faucet.js")
+			if err := os.WriteFile(faucetPath, faucetJS, 0755); err != nil {
+				setupError = fmt.Errorf("failed to write faucet.js: %w", err)
 				return
 			}
 

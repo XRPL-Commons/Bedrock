@@ -71,7 +71,7 @@ faucet_url = "http://localhost:8080/faucet"
 [networks.alphanet]
 url = "wss://alphanet.nerdnest.xyz"
 network_id = 21465
-faucet_url = "https://alphanet-faucet.nerdnest.xyz"
+faucet_url = "https://alphanet.faucet.nerdnest.xyz/accounts"
 
 [contracts.main]
 source = "contract/src/lib.rs"
