@@ -200,19 +200,27 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 	color.Cyan("Deployment Details:\n")
 	fmt.Printf("  Transaction Hash: %s\n", result.TxHash)
-	fmt.Printf("  Wallet Address: %s\n", result.WalletAddress)
-	fmt.Printf("  Wallet Seed: %s\n", result.WalletSeed)
+
+	// Highlight the contract account (most important info)
 	if result.ContractAccount != "" {
-		fmt.Printf("  Contract Account: %s\n", result.ContractAccount)
+		color.Green("  Contract Account: %s\n", result.ContractAccount)
+	} else {
+		color.Yellow("  Contract Account: (not found - check explorer)\n")
 	}
+
 	if result.ContractIndex != "" {
 		fmt.Printf("  Contract Index: %s\n", result.ContractIndex)
 	}
 
+	fmt.Printf("  Wallet Address: %s\n", result.WalletAddress)
+	fmt.Printf("  Wallet Seed: %s\n", result.WalletSeed)
+
 	fmt.Println()
 	color.Yellow("💡 Tips:\n")
 	color.Yellow("   • Save the wallet seed to interact with the contract later\n")
-	color.Yellow("   • Call contract functions with: bedrock call <contract-account> <function>\n")
+	if result.ContractAccount != "" {
+		color.Yellow("   • Call functions with: bedrock call %s <function-name> --wallet %s\n", result.ContractAccount, result.WalletSeed)
+	}
 
 	return nil
 }

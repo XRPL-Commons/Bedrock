@@ -120,20 +120,20 @@ function buildFunctionsFromABI(abi, exportedFunctions) {
     }
 
     // Build Parameters array from ABI
-    const parameters = fn.parameters.map(param => ({
+    const parameters = fn.parameters.map((param) => ({
       Parameter: {
         ParameterName: Buffer.from(param.name).toString('hex').toUpperCase(),
         ParameterType: {
-          type: param.type
-        }
-      }
+          type: param.type,
+        },
+      },
     }));
 
     functions.push({
       Function: {
         FunctionName: Buffer.from(fn.name).toString('hex').toUpperCase(),
-        Parameters: parameters.length > 0 ? parameters : undefined
-      }
+        Parameters: parameters.length > 0 ? parameters : undefined,
+      },
     });
   }
 
@@ -144,7 +144,15 @@ function buildFunctionsFromABI(abi, exportedFunctions) {
  * Deploy contract to XRPL network
  */
 async function deployContract(config) {
-  const { wasm_path, abi_path, network_url, wallet_seed, faucet_url, fee, verbose } = config;
+  const {
+    wasm_path,
+    abi_path,
+    network_url,
+    wallet_seed,
+    faucet_url,
+    fee,
+    verbose,
+  } = config;
 
   const log = verbose ? console.error.bind(console) : () => {};
 
@@ -197,11 +205,16 @@ async function deployContract(config) {
 
       log('\nFunction definitions:');
       Functions.forEach((f, idx) => {
-        const funcName = Buffer.from(f.Function.FunctionName, 'hex').toString('utf8');
+        const funcName = Buffer.from(f.Function.FunctionName, 'hex').toString(
+          'utf8'
+        );
         log(`  ${idx + 1}. ${funcName}`);
         if (f.Function.Parameters) {
-          f.Function.Parameters.forEach(p => {
-            const paramName = Buffer.from(p.Parameter.ParameterName, 'hex').toString('utf8');
+          f.Function.Parameters.forEach((p) => {
+            const paramName = Buffer.from(
+              p.Parameter.ParameterName,
+              'hex'
+            ).toString('utf8');
             log(`      - ${paramName}: ${p.Parameter.ParameterType.type}`);
           });
         }
@@ -209,10 +222,10 @@ async function deployContract(config) {
     } else {
       // Fallback: no ABI, just function names
       log('\nNo ABI provided, deploying with function names only');
-      Functions = exportedFunctions.map(name => ({
+      Functions = exportedFunctions.map((name) => ({
         Function: {
-          FunctionName: Buffer.from(name).toString('hex').toUpperCase()
-        }
+          FunctionName: Buffer.from(name).toString('hex').toUpperCase(),
+        },
       }));
     }
 
@@ -253,7 +266,11 @@ async function deployContract(config) {
       for (const node of meta.AffectedNodes) {
         if (node.CreatedNode?.LedgerEntryType === 'Contract') {
           contractIndex = node.CreatedNode.LedgerIndex;
+          contractAccount = node.CreatedNode.NewFields?.ContractAccount;
           log('\nContract Ledger Index:', contractIndex);
+          if (contractAccount) {
+            log('Contract Account:', contractAccount);
+          }
         }
       }
     }
@@ -271,13 +288,12 @@ async function deployContract(config) {
         contractAccount: contractAccount,
         contractIndex: contractIndex,
         validated: result.result.validated,
-        meta: meta
-      }
+        meta: meta,
+      },
     };
 
     console.log(JSON.stringify(deploymentInfo));
     return deploymentInfo;
-
   } catch (error) {
     if (client.isConnected()) {
       await client.disconnect();
@@ -287,7 +303,7 @@ async function deployContract(config) {
     const errorResult = {
       success: false,
       error: error.message,
-      details: error.data ? JSON.stringify(error.data) : error.stack
+      details: error.data ? JSON.stringify(error.data) : error.stack,
     };
 
     console.log(JSON.stringify(errorResult));
@@ -325,7 +341,7 @@ Output is pure JSON to stdout.
     const errorResult = {
       success: false,
       error: `Config file not found: ${configPath}`,
-      details: 'Please provide a valid config JSON file path'
+      details: 'Please provide a valid config JSON file path',
     };
     console.log(JSON.stringify(errorResult));
     process.exit(1);
@@ -339,7 +355,7 @@ Output is pure JSON to stdout.
     const errorResult = {
       success: false,
       error: 'Failed to load config',
-      details: error.message
+      details: error.message,
     };
     console.log(JSON.stringify(errorResult));
     process.exit(1);
