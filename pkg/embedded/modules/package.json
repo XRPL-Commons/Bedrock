@@ -1,0 +1,9 @@
+{
+  "name": "bedrock-js-modules",
+  "version": "1.0.0",
+  "description": "JavaScript modules for XRPL smart contract deployment and interaction",
+  "private": true,
+  "dependencies": {
+    "@transia/xrpl": "^4.4.6-alpha.0"
+  }
+}

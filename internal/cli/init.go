@@ -69,9 +69,9 @@ network_id = 63456
 faucet_url = "http://localhost:8080/faucet"
 
 [networks.alphanet]
-url = "wss://alphanet.xrpl.org"
+url = "wss://alphanet.nerdnest.xyz"
 network_id = 21465
-faucet_url = "https://alphanet-faucet.xrpl.org"
+faucet_url = "https://alphanet-faucet.nerdnest.xyz"
 
 [contracts.main]
 source = "contract/src/lib.rs"
@@ -118,6 +118,7 @@ extern crate std;
 use xrpl_wasm_macros::wasm_export;
 use xrpl_wasm_std::host::trace::trace;
 
+/// @xrpl-function hello
 #[wasm_export]
 fn hello() -> i32 {
     let _ = trace("Hello from XRPL Smart Contract!");
