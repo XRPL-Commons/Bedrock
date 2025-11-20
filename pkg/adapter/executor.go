@@ -65,8 +65,6 @@ func (e *Executor) ExecuteModule(ctx context.Context, moduleName string, config 
 		fmt.Printf("[executor] Config file exists: %v\n", configFile)
 	} else {
 		cmd.Stderr = &stderr
-		fmt.Printf("[debug] Running: node %s %s\n", modulePath, configFile)
-		fmt.Printf("[debug] Config file exists: %v\n", configFile)
 	}
 
 	start := time.Now()
@@ -128,9 +126,6 @@ func (e *Executor) writeConfigFile(config interface{}) (string, error) {
 	if e.verbose {
 		fmt.Printf("[executor] Config file: %s\n", tmpFile.Name())
 		fmt.Printf("[executor] Config data:\n%s\n", string(data))
-	} else {
-		// Always show config in case of issues
-		fmt.Printf("[debug] Config: %s\n", string(data))
 	}
 
 	return tmpFile.Name(), nil

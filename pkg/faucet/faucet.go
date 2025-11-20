@@ -11,6 +11,7 @@ import (
 // Faucet handles requesting funds from XRPL faucets
 type Faucet struct {
 	executor *adapter.Executor
+	verbose  bool
 }
 
 // NewFaucet creates a new Faucet instance
@@ -22,6 +23,7 @@ func NewFaucet(verbose bool) (*Faucet, error) {
 
 	return &Faucet{
 		executor: executor,
+		verbose:  verbose,
 	}, nil
 }
 
@@ -33,7 +35,7 @@ func (f *Faucet) Request(ctx context.Context, config FaucetConfig) (*FaucetResul
 		"wallet_seed":    config.WalletSeed,
 		"wallet_address": config.WalletAddress,
 		"network_url":    config.NetworkURL,
-		"verbose":        f.executor != nil, // Use executor's verbose setting
+		"verbose":        f.verbose,
 	}
 
 	// Execute faucet module
