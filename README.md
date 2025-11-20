@@ -51,12 +51,6 @@ sudo mv bedrock /usr/local/bin/
 bedrock --help
 ```
 
-### Install via Go
-
-```bash
-go install github.com/xrpl-bedrock/bedrock/cmd/bedrock@latest
-```
-
 ### First Run Setup
 
 On first run, Bedrock will automatically:
