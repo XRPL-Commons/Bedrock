@@ -201,7 +201,7 @@ faucet_url = "http://localhost:8080/faucet"
 
 [networks.alphanet]
 url = "wss://alphanet.nerdnest.xyz"
-faucet_url = "https://alphanet-faucet.nerdnest.xyz"
+faucet_url = "https://alphanet.faucet.nerdnest.xyz/accounts"
 ```
 
 ## Writing Smart Contracts

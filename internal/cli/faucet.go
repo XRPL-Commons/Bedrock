@@ -82,7 +82,7 @@ func runFaucet(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 
 	// Create faucet client
-	verbose := false // TODO: get from global flag
+	verbose, _ := cmd.Flags().GetBool("verbose")
 	f, err := faucet.NewFaucet(verbose)
 	if err != nil {
 		color.Red("✗ Failed to initialize faucet: %v\n", err)
@@ -127,8 +127,8 @@ func runFaucet(cmd *cobra.Command, args []string) error {
 	if result.WalletSeed != "" {
 		fmt.Println()
 		color.Yellow("💡 Tips:\n")
-		color.Yellow("   • Save this wallet seed to use for deployments and contract calls\n")
-		color.Yellow("   • Use --wallet %s with deploy and call commands\n", result.WalletSeed)
+		color.Yellow("   • Save this wallet seed securely to use for deployments and contract calls\n")
+		color.Yellow("   • Use --wallet <your-seed> with deploy and call commands\n")
 	}
 
 	return nil
