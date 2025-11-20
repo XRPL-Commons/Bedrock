@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	"github.com/xrpl-bedrock/bedrock/pkg/config"
 	"github.com/xrpl-bedrock/bedrock/pkg/network"
 )
 
@@ -58,7 +59,18 @@ func nodeStart(ctx context.Context, manager *network.Manager) error {
 	color.Cyan("Starting local XRPL node\n")
 	fmt.Println()
 
-	if err := manager.Start(ctx, network.StartOptions{}); err != nil {
+	cfg, err := config.LoadFromWorkingDir()
+	if err != nil {
+		color.Red("✗ Failed to load config: %v\n", err)
+		return err
+	}
+
+	opts := network.StartOptions{
+		DockerImage: cfg.LocalNode.DockerImage,
+		ConfigDir:   cfg.LocalNode.ConfigDir,
+	}
+
+	if err := manager.Start(ctx, opts); err != nil {
 		color.Red("✗ Failed to start node: %v\n", err)
 		return err
 	}
