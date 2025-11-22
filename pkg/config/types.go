@@ -4,13 +4,13 @@ import "time"
 
 // Config represents the bedrock.toml configuration
 type Config struct {
-	Project     ProjectConfig            `toml:"project"`
-	Build       BuildConfig              `toml:"build"`
-	Networks    map[string]NetworkConfig `toml:"networks"`
+	Project     ProjectConfig             `toml:"project"`
+	Build       BuildConfig               `toml:"build"`
+	Networks    map[string]NetworkConfig  `toml:"networks"`
 	Contracts   map[string]ContractConfig `toml:"contracts"`
 	Deployments map[string]DeploymentInfo `toml:"deployments"`
-	Wallets     WalletsConfig            `toml:"wallets"`
-	LocalNode   LocalNodeConfig          `toml:"local_node"`
+	Wallets     WalletsConfig             `toml:"wallets"`
+	LocalNode   LocalNodeConfig           `toml:"local_node"`
 }
 
 type ProjectConfig struct {
@@ -54,7 +54,7 @@ type WalletsConfig struct {
 type LocalNodeConfig struct {
 	ConfigDir      string `toml:"config_dir"`
 	DockerImage    string `toml:"docker_image"`
-	LedgerInterval int    `toml:"ledger_interval"` // Interval in milliseconds for ledger advancement
+	LedgerInterval int    `toml:"ledger_interval"`
 }
 
 // DefaultLocalNodeConfig returns default local node configuration

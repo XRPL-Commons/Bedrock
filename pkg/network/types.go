@@ -6,8 +6,8 @@ import "time"
 type StartOptions struct {
 	DockerImage    string
 	ConfigDir      string
-	LedgerInterval time.Duration // Interval for ledger advancement
-	RPCURL         string        // RPC URL for ledger service
+	LedgerInterval time.Duration
+	RPCURL         string
 }
 
 // NodeStatus represents the current status of the node
