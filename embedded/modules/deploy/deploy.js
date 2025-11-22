@@ -166,7 +166,7 @@ async function deployContract(config) {
 
     // Create or restore wallet
     const wallet = wallet_seed
-      ? xrpl.Wallet.fromSeed(wallet_seed)
+      ? xrpl.Wallet.fromSeed(wallet_seed, { algorithm: xrpl.ECDSA.secp256k1 })
       : xrpl.Wallet.generate();
 
     log('\nWallet:');

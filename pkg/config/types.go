@@ -52,14 +52,16 @@ type WalletsConfig struct {
 
 // LocalNodeConfig points to the directory containing rippled config files
 type LocalNodeConfig struct {
-	ConfigDir   string `toml:"config_dir"`
-	DockerImage string `toml:"docker_image"`
+	ConfigDir      string `toml:"config_dir"`
+	DockerImage    string `toml:"docker_image"`
+	LedgerInterval int    `toml:"ledger_interval"` // Interval in milliseconds for ledger advancement
 }
 
 // DefaultLocalNodeConfig returns default local node configuration
 func DefaultLocalNodeConfig() LocalNodeConfig {
 	return LocalNodeConfig{
-		ConfigDir:   ".bedrock/node-config",
-		DockerImage: "transia/alphanet:latest",
+		ConfigDir:      ".bedrock/node-config",
+		DockerImage:    "transia/alphanet:latest",
+		LedgerInterval: 1000, // 1 second default
 	}
 }
