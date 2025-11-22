@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
@@ -15,12 +16,14 @@ import (
 )
 
 const (
-	ContainerName = "bedrock-xrpl-node"
+	ContainerName       = "bedrock-xrpl-node"
+	DefaultNodeReadyTimeout = 30 * time.Second
 )
 
 // Manager handles Docker-based XRPL node
 type Manager struct {
-	docker *client.Client
+	docker        *client.Client
+	ledgerService *LedgerService
 }
 
 // NewManager creates a new network manager
@@ -95,11 +98,43 @@ func (m *Manager) Start(ctx context.Context, opts StartOptions) error {
 		return fmt.Errorf("failed to start container: %w", err)
 	}
 
+	// Start ledger service if interval is configured
+	if opts.LedgerInterval > 0 && opts.RPCURL != "" {
+		ledgerService, err := NewLedgerService(opts.RPCURL, opts.LedgerInterval)
+		if err != nil {
+			// Log warning but don't fail - node is already running
+			fmt.Printf("Warning: failed to create ledger service: %v\n", err)
+			return nil
+		}
+
+		// Wait for node to be ready before starting ledger service
+		if err := ledgerService.WaitForReady(ctx, DefaultNodeReadyTimeout); err != nil {
+			fmt.Printf("Warning: timeout waiting for node to be ready: %v\n", err)
+			return nil
+		}
+
+		// Start the ledger service with a background context so it continues
+		// running even after the CLI command returns. The service will be
+		// stopped when Stop() is called or when the process exits.
+		if err := ledgerService.Start(context.Background()); err != nil {
+			fmt.Printf("Warning: failed to start ledger service: %v\n", err)
+			return nil
+		}
+
+		m.ledgerService = ledgerService
+	}
+
 	return nil
 }
 
 // Stop stops the local XRPL node
 func (m *Manager) Stop(ctx context.Context) error {
+	// Stop ledger service first
+	if m.ledgerService != nil {
+		m.ledgerService.Stop()
+		m.ledgerService = nil
+	}
+
 	containerInfo, err := m.getContainer(ctx)
 	if err != nil {
 		return fmt.Errorf("node is not running")
@@ -126,12 +161,22 @@ func (m *Manager) Status(ctx context.Context) (*NodeStatus, error) {
 		return &NodeStatus{Running: false}, nil
 	}
 
-	return &NodeStatus{
+	status := &NodeStatus{
 		Running:     containerInfo.State.Running,
 		ContainerID: containerInfo.ID[:12],
 		Image:       containerInfo.Config.Image,
 		Ports:       formatPorts(containerInfo.NetworkSettings.Ports),
-	}, nil
+	}
+
+	// Add ledger service status if available
+	if m.ledgerService != nil {
+		ledgerStatus := m.ledgerService.GetStatus()
+		status.LedgerServiceRunning = ledgerStatus.Running
+		status.LedgersAdvanced = ledgerStatus.LedgersAdvanced
+		status.LastLedgerIndex = ledgerStatus.LastLedgerIndex
+	}
+
+	return status, nil
 }
 
 // Close closes the Docker client

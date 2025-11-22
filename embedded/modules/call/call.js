@@ -52,15 +52,17 @@ function buildParametersFromABI(functionDef, paramValues) {
     const value = paramValues[paramDef.name] || paramValues[i];
 
     if (value === undefined && paramDef.flag === 0) {
-      throw new Error(`Required parameter '${paramDef.name}' (${paramDef.type}) not provided`);
+      throw new Error(
+        `Required parameter '${paramDef.name}' (${paramDef.type}) not provided`
+      );
     }
 
     if (value !== undefined) {
       parameters.push({
         ParameterValue: {
           ParameterFlag: paramDef.flag,
-          ParameterValue: formatParameterValue(paramDef.type, value)
-        }
+          ParameterValue: formatParameterValue(paramDef.type, value),
+        },
       });
     }
   }
@@ -83,22 +85,23 @@ function formatParameterValue(type, value) {
     case 'UINT256':
       return {
         type: type,
-        value: value.toString()
+        value: value.toString(),
       };
 
     case 'VL':
       // Variable length - convert string to hex
       return {
         type: 'VL',
-        value: typeof value === 'string' && !value.startsWith('0x')
-          ? Buffer.from(value).toString('hex').toUpperCase()
-          : value.replace('0x', '').toUpperCase()
+        value:
+          typeof value === 'string' && !value.startsWith('0x')
+            ? Buffer.from(value).toString('hex').toUpperCase()
+            : value.replace('0x', '').toUpperCase(),
       };
 
     case 'ACCOUNT':
       return {
         type: 'ACCOUNT',
-        value: value // r-address format
+        value: value, // r-address format
       };
 
     case 'AMOUNT':
@@ -106,30 +109,30 @@ function formatParameterValue(type, value) {
       if (typeof value === 'string' || typeof value === 'number') {
         return {
           type: 'AMOUNT',
-          value: value.toString()
+          value: value.toString(),
         };
       }
       return {
         type: 'AMOUNT',
-        value: value // Already formatted object
+        value: value, // Already formatted object
       };
 
     case 'NUMBER':
       return {
         type: 'NUMBER',
-        value: parseFloat(value)
+        value: parseFloat(value),
       };
 
     case 'CURRENCY':
       return {
         type: 'CURRENCY',
-        value: value
+        value: value,
       };
 
     case 'ISSUE':
       return {
         type: 'ISSUE',
-        value: value
+        value: value,
       };
 
     default:
@@ -150,7 +153,7 @@ async function callContract(config) {
     parameters,
     computation_allowance,
     fee,
-    verbose
+    verbose,
   } = config;
 
   const log = verbose ? console.error.bind(console) : () => {};
@@ -165,7 +168,7 @@ async function callContract(config) {
 
     // Create or restore wallet
     const wallet = wallet_seed
-      ? xrpl.Wallet.fromSeed(wallet_seed)
+      ? xrpl.Wallet.fromSeed(seed, { algorithm: ECDSA.secp256k1 })
       : xrpl.Wallet.generate();
 
     log('\nWallet:');
@@ -184,13 +187,13 @@ async function callContract(config) {
       const abi = JSON.parse(abiContent);
 
       // Find function in ABI
-      functionDef = abi.functions.find(f => f.name === function_name);
+      functionDef = abi.functions.find((f) => f.name === function_name);
 
       if (functionDef) {
         log(`\nFunction signature:`);
         log(`  ${function_name}(`);
         if (functionDef.parameters) {
-          functionDef.parameters.forEach(p => {
+          functionDef.parameters.forEach((p) => {
             const required = p.flag === 0 ? 'required' : 'optional';
             log(`    ${p.name}: ${p.type} (${required})`);
           });
@@ -228,7 +231,9 @@ async function callContract(config) {
     // Create ContractCall transaction
     log('\nSubmitting contract call transaction...');
 
-    const functionNameHex = Buffer.from(function_name).toString('hex').toUpperCase();
+    const functionNameHex = Buffer.from(function_name)
+      .toString('hex')
+      .toUpperCase();
 
     const tx = {
       TransactionType: 'ContractCall',
@@ -279,7 +284,10 @@ async function callContract(config) {
       log('\nGas/Computation Used:');
       log(`  Gas Used: ${meta.GasUsed}`);
       log(`  Allowance: ${prepared.ComputationAllowance}`);
-      const percentage = ((meta.GasUsed / parseInt(prepared.ComputationAllowance)) * 100).toFixed(2);
+      const percentage = (
+        (meta.GasUsed / parseInt(prepared.ComputationAllowance)) *
+        100
+      ).toFixed(2);
       log(`  Percentage: ${percentage}%`);
     }
 
@@ -296,13 +304,12 @@ async function callContract(config) {
         gasUsed: meta?.GasUsed,
         validated: txResult.validated,
         transactionResult: meta?.TransactionResult,
-        meta: meta
-      }
+        meta: meta,
+      },
     };
 
     console.log(JSON.stringify(callResult));
     return callResult;
-
   } catch (error) {
     if (client.isConnected()) {
       await client.disconnect();
@@ -312,7 +319,7 @@ async function callContract(config) {
     const errorResult = {
       success: false,
       error: error.message,
-      details: error.data ? JSON.stringify(error.data) : error.stack
+      details: error.data ? JSON.stringify(error.data) : error.stack,
     };
 
     console.log(JSON.stringify(errorResult));
@@ -352,7 +359,7 @@ Output is pure JSON to stdout.
     const errorResult = {
       success: false,
       error: `Config file not found: ${configPath}`,
-      details: 'Please provide a valid config JSON file path'
+      details: 'Please provide a valid config JSON file path',
     };
     console.log(JSON.stringify(errorResult));
     process.exit(1);
@@ -366,7 +373,7 @@ Output is pure JSON to stdout.
     const errorResult = {
       success: false,
       error: 'Failed to load config',
-      details: error.message
+      details: error.message,
     };
     console.log(JSON.stringify(errorResult));
     process.exit(1);

@@ -3,11 +3,24 @@ package cli
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+	"syscall"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/xrpl-bedrock/bedrock/pkg/config"
 	"github.com/xrpl-bedrock/bedrock/pkg/network"
+)
+
+const (
+	// Default RPC URL for local node (uses HTTP RPC port)
+	DefaultLocalRPCURL = "http://localhost:5005"
+	// PID file for ledger daemon
+	LedgerDaemonPIDFile = ".bedrock/ledger-daemon.pid"
 )
 
 var nodeCmd = &cobra.Command{
@@ -65,9 +78,14 @@ func nodeStart(ctx context.Context, manager *network.Manager) error {
 		return err
 	}
 
+	// Convert ledger interval from milliseconds to duration
+	ledgerInterval := time.Duration(cfg.LocalNode.LedgerInterval) * time.Millisecond
+
 	opts := network.StartOptions{
-		DockerImage: cfg.LocalNode.DockerImage,
-		ConfigDir:   cfg.LocalNode.ConfigDir,
+		DockerImage:    cfg.LocalNode.DockerImage,
+		ConfigDir:      cfg.LocalNode.ConfigDir,
+		LedgerInterval: ledgerInterval,
+		RPCURL:         DefaultLocalRPCURL,
 	}
 
 	if err := manager.Start(ctx, opts); err != nil {
@@ -78,14 +96,81 @@ func nodeStart(ctx context.Context, manager *network.Manager) error {
 	fmt.Println()
 	color.Green("✓ Local node started successfully!\n")
 	fmt.Println()
+
+	// Start the ledger daemon in background
+	if err := startLedgerDaemon(cfg.LocalNode.LedgerInterval); err != nil {
+		color.Yellow("Warning: Failed to start ledger daemon: %v\n", err)
+		color.Yellow("Ledgers will not advance automatically.\n")
+	} else {
+		color.Green("✓ Ledger daemon started\n")
+	}
+
+	fmt.Println()
 	color.Cyan("Connection Details:\n")
 	fmt.Println("  WebSocket URL: ws://localhost:6006")
-	fmt.Println("  Faucet URL: http://localhost:8080/faucet")
+	fmt.Println("  RPC URL:       http://localhost:5005")
 	fmt.Println()
-	color.Yellow("💡 Tips:\n")
-	color.Yellow("   • Deploy with: bedrock deploy --network local\n")
-	color.Yellow("   • View logs with: bedrock node logs\n")
-	color.Yellow("   • Stop with: bedrock node stop\n")
+	color.Cyan("Ledger Service:\n")
+	fmt.Printf("  Auto-advance interval: %v\n", ledgerInterval)
+	fmt.Println("  Ledgers will advance automatically in background")
+	fmt.Println()
+	color.Yellow("Tips:\n")
+	color.Yellow("   Deploy with: bedrock deploy --network local\n")
+	color.Yellow("   View logs with: bedrock node logs\n")
+	color.Yellow("   Stop with: bedrock node stop\n")
+
+	return nil
+}
+
+// startLedgerDaemon spawns the ledger daemon as a background process
+func startLedgerDaemon(intervalMs int) error {
+	// Get the path to the current executable
+	executable, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get executable path: %w", err)
+	}
+
+	// Create the .bedrock directory if it doesn't exist
+	if err := os.MkdirAll(".bedrock", 0755); err != nil {
+		return fmt.Errorf("failed to create .bedrock directory: %w", err)
+	}
+
+	// Open log file for daemon output
+	logFile, err := os.OpenFile(".bedrock/ledger-daemon.log", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to create log file: %w", err)
+	}
+
+	// Start the daemon process
+	cmd := exec.Command(executable, "_ledger-daemon",
+		"--rpc-url", DefaultLocalRPCURL,
+		"--interval", strconv.Itoa(intervalMs),
+	)
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true, // Create new process group so it survives parent exit
+	}
+
+	if err := cmd.Start(); err != nil {
+		logFile.Close()
+		return fmt.Errorf("failed to start daemon: %w", err)
+	}
+
+	// Write PID file
+	pidFile := filepath.Join(".bedrock", "ledger-daemon.pid")
+	if err := os.WriteFile(pidFile, []byte(strconv.Itoa(cmd.Process.Pid)), 0644); err != nil {
+		// Kill the process if we can't write PID file
+		cmd.Process.Kill()
+		logFile.Close()
+		return fmt.Errorf("failed to write PID file: %w", err)
+	}
+
+	// Don't wait for the process - let it run in background
+	go func() {
+		cmd.Wait()
+		logFile.Close()
+	}()
 
 	return nil
 }
@@ -94,6 +179,13 @@ func nodeStop(ctx context.Context, manager *network.Manager) error {
 	color.Cyan("Stopping local XRPL node\n")
 	fmt.Println()
 
+	// Stop the ledger daemon first
+	if err := stopLedgerDaemon(); err != nil {
+		color.Yellow("Warning: %v\n", err)
+	} else {
+		color.Green("✓ Ledger daemon stopped\n")
+	}
+
 	if err := manager.Stop(ctx); err != nil {
 		color.Red("✗ Failed to stop node: %v\n", err)
 		return err
@@ -101,6 +193,48 @@ func nodeStop(ctx context.Context, manager *network.Manager) error {
 
 	fmt.Println()
 	color.Green("✓ Local node stopped\n")
+
+	return nil
+}
+
+// stopLedgerDaemon stops the ledger daemon process
+func stopLedgerDaemon() error {
+	pidFile := filepath.Join(".bedrock", "ledger-daemon.pid")
+
+	// Read PID file
+	pidBytes, err := os.ReadFile(pidFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil // No daemon running
+		}
+		return fmt.Errorf("failed to read PID file: %w", err)
+	}
+
+	pid, err := strconv.Atoi(string(pidBytes))
+	if err != nil {
+		os.Remove(pidFile)
+		return fmt.Errorf("invalid PID in file: %w", err)
+	}
+
+	// Find and kill the process
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		os.Remove(pidFile)
+		return nil // Process not found
+	}
+
+	// Send SIGTERM for graceful shutdown
+	if err := process.Signal(syscall.SIGTERM); err != nil {
+		// Process might already be dead
+		os.Remove(pidFile)
+		return nil
+	}
+
+	// Wait a moment for graceful shutdown
+	time.Sleep(500 * time.Millisecond)
+
+	// Clean up PID file
+	os.Remove(pidFile)
 
 	return nil
 }
@@ -118,8 +252,20 @@ func nodeStatus(ctx context.Context, manager *network.Manager) error {
 	if status.Running {
 		color.Green("✓ Local node is running\n")
 		fmt.Println()
+		color.Cyan("Connection Details:\n")
 		fmt.Println("  WebSocket URL: ws://localhost:6006")
-		fmt.Println("  Faucet URL: http://localhost:8080/faucet")
+		fmt.Println("  RPC URL:       http://localhost:5005")
+		fmt.Println()
+
+		// Show ledger daemon status
+		color.Cyan("Ledger Daemon:\n")
+		if isLedgerDaemonRunning() {
+			color.Green("  Status: Running\n")
+			fmt.Println("  Log:    .bedrock/ledger-daemon.log")
+		} else {
+			color.Yellow("  Status: Not running\n")
+			fmt.Println("  Restart node to start ledger daemon")
+		}
 	} else {
 		color.Yellow("⊙ Local node is not running\n")
 		fmt.Println()
@@ -127,6 +273,31 @@ func nodeStatus(ctx context.Context, manager *network.Manager) error {
 	}
 
 	return nil
+}
+
+// isLedgerDaemonRunning checks if the ledger daemon process is running
+func isLedgerDaemonRunning() bool {
+	pidFile := filepath.Join(".bedrock", "ledger-daemon.pid")
+
+	pidBytes, err := os.ReadFile(pidFile)
+	if err != nil {
+		return false
+	}
+
+	pid, err := strconv.Atoi(string(pidBytes))
+	if err != nil {
+		return false
+	}
+
+	// Check if process exists by sending signal 0
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+
+	// Signal 0 doesn't actually send a signal, just checks if process exists
+	err = process.Signal(syscall.Signal(0))
+	return err == nil
 }
 
 func nodeLogs(manager *network.Manager) error {

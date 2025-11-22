@@ -4,13 +4,13 @@ import "time"
 
 // Config represents the bedrock.toml configuration
 type Config struct {
-	Project     ProjectConfig            `toml:"project"`
-	Build       BuildConfig              `toml:"build"`
-	Networks    map[string]NetworkConfig `toml:"networks"`
+	Project     ProjectConfig             `toml:"project"`
+	Build       BuildConfig               `toml:"build"`
+	Networks    map[string]NetworkConfig  `toml:"networks"`
 	Contracts   map[string]ContractConfig `toml:"contracts"`
 	Deployments map[string]DeploymentInfo `toml:"deployments"`
-	Wallets     WalletsConfig            `toml:"wallets"`
-	LocalNode   LocalNodeConfig          `toml:"local_node"`
+	Wallets     WalletsConfig             `toml:"wallets"`
+	LocalNode   LocalNodeConfig           `toml:"local_node"`
 }
 
 type ProjectConfig struct {
@@ -52,14 +52,16 @@ type WalletsConfig struct {
 
 // LocalNodeConfig points to the directory containing rippled config files
 type LocalNodeConfig struct {
-	ConfigDir   string `toml:"config_dir"`
-	DockerImage string `toml:"docker_image"`
+	ConfigDir      string `toml:"config_dir"`
+	DockerImage    string `toml:"docker_image"`
+	LedgerInterval int    `toml:"ledger_interval"`
 }
 
 // DefaultLocalNodeConfig returns default local node configuration
 func DefaultLocalNodeConfig() LocalNodeConfig {
 	return LocalNodeConfig{
-		ConfigDir:   ".bedrock/node-config",
-		DockerImage: "transia/alphanet:latest",
+		ConfigDir:      ".bedrock/node-config",
+		DockerImage:    "transia/alphanet:latest",
+		LedgerInterval: 1000, // 1 second default
 	}
 }

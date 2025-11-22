@@ -38,13 +38,8 @@ const http = require('http');
  * Request funds from XRPL faucet
  */
 async function requestFaucet(config) {
-  const {
-    faucet_url,
-    wallet_seed,
-    wallet_address,
-    network_url,
-    verbose,
-  } = config;
+  const { faucet_url, wallet_seed, wallet_address, network_url, verbose } =
+    config;
 
   const log = verbose ? console.error.bind(console) : () => {};
 
@@ -56,7 +51,7 @@ async function requestFaucet(config) {
 
     // Determine wallet/address
     if (wallet_seed) {
-      wallet = xrpl.Wallet.fromSeed(wallet_seed);
+      wallet = xrpl.Wallet.fromSeed(seed, { algorithm: ECDSA.secp256k1 });
       address = wallet.address;
       log('Using provided wallet seed');
       log('  Address:', address);
@@ -151,7 +146,8 @@ function makeFaucetRequest(faucetUrl, address) {
             const response = JSON.parse(data);
             // Different faucets return different formats
             // Try to extract relevant info
-            const txHash = response.hash || response.txHash || response.tx_hash || 'unknown';
+            const txHash =
+              response.hash || response.txHash || response.tx_hash || 'unknown';
             const amount = response.amount || response.balance || 'unknown';
 
             resolve({
@@ -159,10 +155,16 @@ function makeFaucetRequest(faucetUrl, address) {
               amount: String(amount),
             });
           } catch (err) {
-            reject(new Error(`Failed to parse faucet response: ${err.message}`));
+            reject(
+              new Error(`Failed to parse faucet response: ${err.message}`)
+            );
           }
         } else {
-          reject(new Error(`Faucet request failed with status ${res.statusCode}: ${data}`));
+          reject(
+            new Error(
+              `Faucet request failed with status ${res.statusCode}: ${data}`
+            )
+          );
         }
       });
     });

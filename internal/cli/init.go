@@ -62,6 +62,7 @@ target = "wasm32-unknown-unknown"
 [local_node]
 config_dir = ".bedrock/node-config"
 docker_image = "transia/alphanet:latest"
+ledger_interval = 1000
 
 [networks.local]
 url = "ws://localhost:6006"
