@@ -51,7 +51,7 @@ async function requestFaucet(config) {
 
     // Determine wallet/address
     if (wallet_seed) {
-      wallet = xrpl.Wallet.fromSeed(seed, { algorithm: ECDSA.secp256k1 });
+      wallet = xrpl.Wallet.fromSeed(seed, { algorithm: xrpl.ECDSA.secp256k1 });
       address = wallet.address;
       log('Using provided wallet seed');
       log('  Address:', address);
@@ -59,7 +59,7 @@ async function requestFaucet(config) {
       address = wallet_address;
       log('Using provided address:', address);
     } else {
-      wallet = xrpl.Wallet.generate();
+      wallet = xrpl.Wallet.generate(xrpl.ECDSA.secp256k1);
       address = wallet.address;
       log('Generated new wallet');
       log('  Address:', address);
