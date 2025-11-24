@@ -166,7 +166,7 @@ async function deployContract(config) {
 
     // Create or restore wallet
     const wallet = wallet_seed
-      ? xrpl.Wallet.fromSeed(wallet_seed, { algorithm: xrpl.ECDSA.secp256k1 })
+      ? xrpl.Wallet.fromSeed(wallet_seed)
       : xrpl.Wallet.generate();
 
     log('\nWallet:');
@@ -229,12 +229,78 @@ async function deployContract(config) {
       }));
     }
 
-    // Check balance
-    const balance = await client.getXrpBalance(wallet.address);
+    // Check balance and auto-fund if needed
+    let balance;
+    try {
+      balance = await client.getXrpBalance(wallet.address);
+    } catch (error) {
+      // Account doesn't exist yet, balance is 0
+      if (error.data && error.data.error === 'actNotFound') {
+        balance = '0';
+      } else {
+        throw error;
+      }
+    }
+    
     log(`\nWallet balance: ${balance} XRP`);
 
     if (parseFloat(balance) === 0) {
-      log('Warning: Wallet not funded, deployment will likely fail');
+      log('Wallet not funded, attempting to fund from faucet...');
+      
+      const defaultFaucetUrl = 'https://alphanet.faucet.nerdnest.xyz/accounts';
+      const faucetUrlToUse = faucet_url || defaultFaucetUrl;
+      
+      try {
+        const https = require('https');
+        const http = require('http');
+        const requestData = JSON.stringify({ destination: wallet.address });
+        const parsedUrl = new URL(faucetUrlToUse);
+        
+        await new Promise((resolve, reject) => {
+          const options = {
+            hostname: parsedUrl.hostname,
+            port: parsedUrl.port || (parsedUrl.protocol === 'https:' ? 443 : 80),
+            path: parsedUrl.pathname,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(requestData)
+            }
+          };
+          
+          const request = (parsedUrl.protocol === 'https:' ? https : http).request(options, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+              log(`Faucet response: ${res.statusCode} - ${data}`);
+              if (res.statusCode === 200) {
+                log('✓ Successfully funded from faucet');
+                resolve();
+              } else {
+                reject(new Error(`Faucet request failed: ${res.statusCode} - ${data}`));
+              }
+            });
+          });
+          
+          request.on('error', (error) => {
+            reject(new Error(`Faucet request failed: ${error.message}`));
+          });
+          
+          request.write(requestData);
+          request.end();
+        });
+        
+        // Wait for funding to process
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        balance = await client.getXrpBalance(wallet.address);
+        log(`Updated balance: ${balance} XRP`);
+        
+        if (parseFloat(balance) === 0) {
+          throw new Error('Wallet funding failed - balance still zero after faucet request');
+        }
+      } catch (error) {
+        throw new Error(`Failed to fund wallet: ${error.message}. Please fund manually: ${wallet.address}`);
+      }
     }
 
     // Create ContractCreate transaction
