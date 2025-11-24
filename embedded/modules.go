@@ -250,3 +250,24 @@ func GetModulePath(moduleName string) (string, error) {
 
 	return modulePath, nil
 }
+
+// CleanCache removes the entire bedrock cache directory, forcing a fresh
+// reinstall of JS modules on next use
+func CleanCache() error {
+	cache, err := getCacheDir()
+	if err != nil {
+		return fmt.Errorf("failed to get cache directory: %w", err)
+	}
+
+	// Remove the modules cache
+	if err := os.RemoveAll(cache); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove cache directory: %w", err)
+	}
+
+	return nil
+}
+
+// GetCacheDir returns the cache directory path (for display purposes)
+func GetCacheDir() (string, error) {
+	return getCacheDir()
+}
