@@ -34,6 +34,7 @@ func (c *Caller) Call(ctx context.Context, config CallConfig) (*CallResult, erro
 		"contract_account": config.ContractAccount,
 		"function_name":    config.FunctionName,
 		"network_url":      config.NetworkURL,
+		"network_id":       config.NetworkID,
 		"wallet_seed":      config.WalletSeed,
 		"verbose":          c.verbose,
 	}

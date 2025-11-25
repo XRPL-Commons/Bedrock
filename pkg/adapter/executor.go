@@ -89,7 +89,7 @@ func (e *Executor) ExecuteModule(ctx context.Context, moduleName string, config 
 	result, err := e.parseResult(stdout.Bytes())
 	if err != nil {
 		// Show both stdout and stderr on parse errors
-		errMsg := fmt.Sprintf("failed to parse result: %w\nStdout: %s", err, stdout.String())
+		errMsg := fmt.Sprintf("failed to parse result: %v\nStdout: %s", err, stdout.String())
 		if stderr.Len() > 0 {
 			errMsg += fmt.Sprintf("\nStderr: %s", stderr.String())
 		}

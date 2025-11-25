@@ -168,7 +168,7 @@ async function callContract(config) {
 
     // Create or restore wallet
     const wallet = wallet_seed
-      ? xrpl.Wallet.fromSeed(seed, { algorithm: xrpl.ECDSA.secp256k1 })
+      ? xrpl.Wallet.fromSeed(wallet_seed, { algorithm: xrpl.ECDSA.secp256k1 })
       : xrpl.Wallet.generate(xrpl.ECDSA.secp256k1);
 
     log('\nWallet:');
@@ -235,6 +235,22 @@ async function callContract(config) {
       .toString('hex')
       .toUpperCase();
 
+    // Get account sequence and current ledger manually to avoid autofill
+    const [accountInfo, ledgerInfo] = await Promise.all([
+      client.request({
+        command: 'account_info',
+        account: wallet.address,
+      }),
+      client.request({
+        command: 'ledger',
+        ledger_index: 'validated',
+      })
+    ]);
+
+    const currentLedger = ledgerInfo.result.ledger_index;
+    log(`Current ledger: ${currentLedger}`);
+    log(`Target LastLedgerSequence: ${currentLedger + 10}`);
+    
     const tx = {
       TransactionType: 'ContractCall',
       Account: wallet.address,
@@ -242,10 +258,14 @@ async function callContract(config) {
       FunctionName: functionNameHex,
       Parameters: Parameters,
       ComputationAllowance: computation_allowance || '1000000',
-      Fee: fee || '1000000', // 1 XRP default
+      Fee: fee || '1000000',
+      Sequence: accountInfo.result.account_data.Sequence,
+      LastLedgerSequence: currentLedger + 10,
+      SigningPubKey: wallet.publicKey,
+      NetworkID: config.network_id
     };
 
-    const prepared = await client.autofill(tx);
+    const prepared = tx;
     const signed = wallet.sign(prepared);
 
     log('Transaction ID:', signed.hash);
