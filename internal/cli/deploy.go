@@ -11,6 +11,7 @@ import (
 	"github.com/xrpl-bedrock/bedrock/pkg/builder"
 	"github.com/xrpl-bedrock/bedrock/pkg/config"
 	"github.com/xrpl-bedrock/bedrock/pkg/deployer"
+	"github.com/xrpl-bedrock/bedrock/pkg/wallet"
 )
 
 var (
@@ -39,7 +40,7 @@ func init() {
 	rootCmd.AddCommand(deployCmd)
 
 	deployCmd.Flags().StringVarP(&deployNetwork, "network", "n", "alphanet", "Network to deploy to (local, alphanet, testnet, mainnet)")
-	deployCmd.Flags().StringVarP(&deployWallet, "wallet", "w", "", "Wallet seed (generates new if not provided)")
+	deployCmd.Flags().StringVarP(&deployWallet, "wallet", "w", "", "Wallet seed or name (generates new if not provided)")
 	deployCmd.Flags().StringVarP(&deployABI, "abi", "a", "abi.json", "Path to ABI file")
 	deployCmd.Flags().BoolVar(&deploySkipBuild, "skip-build", false, "Skip building the contract")
 	deployCmd.Flags().BoolVar(&deploySkipABI, "skip-abi", false, "Skip generating ABI")
@@ -164,8 +165,22 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 	// Determine faucet URL
 	faucetURL := networkCfg.FaucetURL
 
+	// Resolve wallet seed
+	var walletSeed string
 	if deployWallet != "" {
-		color.White("   Wallet: Using provided seed\n")
+		resolver, err := wallet.NewWalletResolver()
+		if err != nil {
+			color.Red("✗ Failed to initialize wallet resolver: %v\n", err)
+			return err
+		}
+
+		walletSeed, err = resolver.ResolveWallet(deployWallet)
+		if err != nil {
+			color.Red("✗ Failed to resolve wallet: %v\n", err)
+			return err
+		}
+
+		color.White("   Wallet: Using provided wallet/seed\n")
 	} else {
 		color.White("   Wallet: Generating new wallet\n")
 	}
@@ -185,7 +200,7 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		WasmPath:   wasmPath,
 		ABIPath:    abiPath,
 		NetworkURL: networkCfg.URL,
-		WalletSeed: deployWallet,
+		WalletSeed: walletSeed,
 		FaucetURL:  faucetURL,
 	})
 
