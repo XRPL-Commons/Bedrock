@@ -16,6 +16,7 @@ type CallConfig struct {
 	ContractAccount      string
 	FunctionName         string
 	NetworkURL           string
+	NetworkID            uint32
 	WalletSeed           string
 	ABIPath              string
 	Parameters           map[string]interface{} // JSON parameters

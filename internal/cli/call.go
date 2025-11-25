@@ -67,7 +67,8 @@ func runCall(cmd *cobra.Command, args []string) error {
 	if !ok {
 		if callNetwork == "local" {
 			networkCfg = config.NetworkConfig{
-				URL: "ws://localhost:6006",
+				URL:       "ws://localhost:6006",
+				NetworkID: 0, // Local network uses network ID 0
 			}
 		} else {
 			return fmt.Errorf("network '%s' not found in config", callNetwork)
@@ -117,6 +118,7 @@ func runCall(cmd *cobra.Command, args []string) error {
 		ContractAccount:      contractAccount,
 		FunctionName:         functionName,
 		NetworkURL:           networkCfg.URL,
+		NetworkID:            networkCfg.NetworkID,
 		WalletSeed:           callWallet,
 		ABIPath:              callABI,
 		Parameters:           params,
