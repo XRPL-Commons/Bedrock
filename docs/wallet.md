@@ -143,12 +143,3 @@ bedrock wallet remove <name>
 ```bash
 bedrock wallet remove my-test-wallet
 ```
-
----
-
-## See Also
-
-- [Local Node Management](./local-node.md)
-- [Building Contracts](./building-contracts.md)
-- [Deploying and Calling Contracts](./deployment-and-calling.md)
-- [ABI Generation](./abi-generation.md)
