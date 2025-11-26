@@ -531,30 +531,3 @@ cargo build --target wasm32-unknown-unknown
 5. Finds the output `.wasm` file
 6. Calculates size and duration
 7. Formats output
-
-**No magic**, just convenience!
-
----
-
-## Future Enhancements
-
-Planned features for `bedrock build`:
-
-- [ ] Watch mode (`--watch`) for auto-rebuild
-- [ ] Custom feature flags (`--features`)
-- [ ] WASM validation (check exports, imports)
-- [ ] Automatic `wasm-opt` integration
-- [ ] Size comparison vs. previous build
-- [ ] Build caching
-- [ ] Parallel builds for multiple contracts
-- [ ] Integration with WASM analyzers
-- [ ] Custom build hooks/scripts
-
----
-
-## See Also
-
-- [Local Node Management](./local-node.md)
-- [Deploying and Calling Contracts](./deployment-and-calling.md)
-- [ABI Generation](./abi-generation.md)
-- [Wallet Management](./wallet.md)
