@@ -353,30 +353,6 @@ Host          Container
 
 - `.bedrock/node-config/genesis.json` → `/genesis.json` (read-only)
 
-Future versions may support:
-
-- Custom rippled.cfg
-- Persistent ledger data
-- Log directories
-
----
-
-## Future Enhancements
-
-Planned features for the local node:
-
-- [ ] Custom port mapping
-- [ ] Persistent ledger data (survive restarts)
-- [ ] Snapshot/restore functionality
-- [ ] Network forking (clone mainnet/testnet state)
-- [ ] Multiple nodes (simulate network)
-- [ ] Log streaming (`bedrock node logs`)
-- [ ] Resource limits (CPU, memory)
-- [ ] Health checks and auto-restart
-
----
-
-## See Also
 
 - [Building Contracts](./building-contracts.md)
 - [Deploying and Calling Contracts](./deployment-and-calling.md)
