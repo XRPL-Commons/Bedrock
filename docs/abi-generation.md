@@ -1,16 +1,16 @@
-# Quartz - ABI Generation
+# ABI Generation
 
-**Quartz** generates Application Binary Interface (ABI) definitions from annotated Rust smart contract source code.
+**Bedrock** generates Application Binary Interface (ABI) definitions from annotated Rust smart contract source code.
 
 ## Overview
 
-Smart contracts need ABIs to describe their functions, parameters, and types. Quartz extracts this information from JSDoc-style comments in your Rust source code, similar to how Ethereum's Solidity compiler generates ABIs.
+Smart contracts need ABIs to describe their functions, parameters, and types. Bedrock extracts this information from JSDoc-style comments in your Rust source code, similar to how Ethereum's Solidity compiler generates ABIs.
 
-Quartz provides:
+Bedrock's ABI generation provides:
 
-- Automatic ABI extraction from source annotations
+- Automatic ABI extraction from source annotations as part of the `deploy` command.
 - Type validation against XRPL type system
-- JSON and JavaScript output formats
+- JSON output
 - Clear error messages for invalid annotations
 
 ## Why ABIs Matter
@@ -24,85 +24,15 @@ WASM binaries only contain function **names**, not parameter types or descriptio
 
 Without an ABI, developers would need to manually maintain this information separately from the code (error-prone and not scalable).
 
-## Commands
+## Automatic Generation
 
-### `bedrock quartz generate`
-
-Generates ABI from annotated Rust source code.
-
-```bash
-bedrock quartz generate
-```
-
-**Flags:**
-
-- `--output, -o` - Output file path (default: `abi.json`)
-- `--js, -j` - Also generate JavaScript module
-- `--name, -n` - Contract name (defaults to project name)
-
-**Examples:**
-
-```bash
-# Generate abi.json
-bedrock quartz generate
-
-# Generate to custom path
-bedrock quartz generate --output contract-abi.json
-
-# Generate both JSON and JS module
-bedrock quartz generate --js
-
-# Specify contract name
-bedrock quartz generate --name my-dns-contract
-```
-
-**What it does:**
-
-1. Reads `bedrock.toml` to locate contract source
-2. Parses all `.rs` files in `contract/src/`
-3. Extracts `@xrpl-function`, `@param`, `@return` annotations
-4. Validates types against XRPL type system
-5. Generates `abi.json` (and optionally `.js` module)
-
-**Output:**
-
-```
-Quartz - Generating contract ABI
-   Source: contract/src/lib.rs
-
-Parsing Rust source files...
-✓ Found 3 function(s)
-
-  register(
-    name: VL // Domain name to register
-    resolver: ACCOUNT // Resolver account address
-    duration: UINT64 // Registration duration in seconds
-  )
-
-  transfer(
-    name: VL // Domain name
-    new_owner: ACCOUNT // New owner address
-  )
-
-  resolve(
-    name: VL // Domain name to resolve
-  ) -> ACCOUNT // Resolver address
-
-✓ Generated ABI: abi.json
-
-Tip: Use this ABI with 'bedrock slate deploy' to deploy your contract
-```
-
-**Requirements:**
-
-- Must be in a bedrock project directory (with `bedrock.toml`)
-- Contract source must have valid annotations
+Bedrock automatically generates the ABI file (`abi.json`) during the `bedrock deploy` process. You no longer need to run a separate command.
 
 ---
 
 ## Annotation Syntax
 
-Quartz uses JSDoc-style annotations to define ABIs directly in Rust source code.
+Bedrock uses JSDoc-style annotations to define ABIs directly in Rust source code.
 
 ### Basic Structure
 
@@ -234,7 +164,7 @@ fn register(name: Blob, resolver: AccountId, duration: u64) -> i32 {
 
 ## Type System
 
-Quartz validates all types against the XRPL smart contract type system.
+Bedrock validates all types against the XRPL smart contract type system.
 
 ### Primitive Integer Types
 
@@ -262,11 +192,7 @@ Quartz validates all types against the XRPL smart contract type system.
 
 ### Type Validation
 
-Quartz will **reject** invalid types with helpful error messages:
-
-```
-Error: invalid type 'STRING' for parameter 'name'. Valid types: UINT8, UINT16, UINT32, UINT64, UINT128, UINT160, UINT192, UINT256, VL, ACCOUNT, AMOUNT, ISSUE, CURRENCY, NUMBER
-```
+Bedrock will **reject** invalid types with helpful error messages during the `deploy` process.
 
 ---
 
@@ -417,11 +343,8 @@ fn renew(name: Blob, duration: u64, auto_renew: u8) -> i32 {
 # Write contract with annotations
 vim contract/src/lib.rs
 
-# Generate ABI
-bedrock quartz generate
-
-# Verify generated ABI
-cat abi.json
+# Deploy the contract, which will also generate the ABI
+bedrock deploy
 ```
 
 ### Iterative Development
@@ -430,22 +353,9 @@ cat abi.json
 # Modify function signatures or add new functions
 vim contract/src/lib.rs
 
-# Regenerate ABI
-bedrock quartz generate
-
-# Build and deploy
-bedrock flint build --release
-bedrock slate deploy --network alphanet
-```
-
-### Integration with Deployment
-
-```bash
-# Generate both JSON and JS module
-bedrock quartz generate --js
-
-# Use in deployment script
-node deploy-contract.js --abi abi.js
+# Build and redeploy
+bedrock build --debug
+bedrock deploy --network local
 ```
 
 ---
@@ -507,7 +417,7 @@ fn register(...) { }
 
 ### Multiple Source Files
 
-Quartz automatically scans all `.rs` files in `contract/src/`:
+Bedrock automatically scans all `.rs` files in `contract/src/`:
 
 ```
 contract/src/
@@ -518,22 +428,12 @@ contract/src/
 
 Only functions with `@xrpl-function` will be included in the ABI.
 
-### Custom Output Paths
-
-```bash
-# Generate to build artifacts directory
-bedrock quartz generate --output build/abi.json
-
-# Generate to deployment directory
-bedrock quartz generate --output deploy/contract-abi.json --js
-```
-
 ### CI/CD Integration
 
 ```bash
 # In your CI pipeline
-bedrock quartz generate
-bedrock flint build --release
+bedrock build --release
+bedrock deploy
 
 # Verify ABI exists and is valid
 test -f abi.json || exit 1
@@ -548,31 +448,22 @@ test -f abi.json || exit 1
 - Deployment scripts can rely on committed ABI
 - Provides audit trail of interface changes
 
-**.gitignore:**
-```
-# Keep abi.json
-!abi.json
-
-# But ignore JS module (auto-generated)
-abi.js
-```
-
 ---
 
 ## Comparison with Ethereum
 
-| Feature                  | Ethereum (Solidity)    | XRPL (Bedrock/Quartz)         |
+| Feature                  | Ethereum (Solidity)    | XRPL (Bedrock)         |
 | ------------------------ | ---------------------- | ----------------------------- |
 | **ABI Source**           | Function signatures    | JSDoc annotations             |
-| **Generation**           | Automatic (compiler)   | Explicit (`quartz generate`)  |
+| **Generation**           | Automatic (compiler)   | Automatic (`deploy`)  |
 | **Type System**          | Solidity types         | XRPL STypes                   |
-| **Format**               | JSON                   | JSON + optional JS            |
+| **Format**               | JSON                   | JSON            |
 | **Parameter Metadata**   | Limited                | Descriptions, flags           |
-| **Validation**           | Compile-time           | Generate-time                 |
+| **Validation**           | Compile-time           | Deploy-time                 |
 
 **Key Difference:**
 
-Solidity's ABI is auto-generated because the language has rich type information. Rust → WASM loses this, so Quartz uses annotations as the source of truth.
+Solidity's ABI is auto-generated because the language has rich type information. Rust → WASM loses this, so Bedrock uses annotations as the source of truth.
 
 ---
 
@@ -615,7 +506,7 @@ To get types, you'd need:
 
 ## Future Enhancements
 
-Planned features for quartz:
+Planned features for ABI generation:
 
 - [ ] Support for struct/enum types in parameters
 - [ ] Rust attribute alternative (`#[xrpl_function]`)
@@ -629,8 +520,7 @@ Planned features for quartz:
 
 ## See Also
 
-- [Flint - Building Contracts](./flint.md)
-- [Slate - Deploying Contracts](./slate.md)
-- [Writing XRPL Smart Contracts](./writing-contracts.md)
-- [XRPL Type System Reference](./types-reference.md)
-- [bedrock.toml Configuration Reference](./config-reference.md)
+- [Building Contracts](./building-contracts.md)
+- [Deploying and Calling Contracts](./deployment-and-calling.md)
+- [Local Node Management](./local-node.md)
+- [Wallet Management](./wallet.md)

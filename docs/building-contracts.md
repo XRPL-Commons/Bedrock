@@ -1,10 +1,10 @@
-# Flint - Contract Building
+# Building Contracts
 
-**Flint** compiles Rust smart contracts to WebAssembly (WASM) for deployment on XRPL. It wraps `cargo` with sensible defaults and a great developer experience.
+**Bedrock** compiles Rust smart contracts to WebAssembly (WASM) for deployment on XRPL. It wraps `cargo` with sensible defaults and a great developer experience.
 
 ## Overview
 
-Flint provides:
+Bedrock's build process provides:
 
 - Smart defaults for WASM compilation
 - Automatic toolchain validation
@@ -14,30 +14,26 @@ Flint provides:
 
 ## Commands
 
-### `bedrock flint build`
+### `bedrock build`
 
 Compiles your Rust smart contract to WASM.
 
 ```bash
-bedrock flint build
+bedrock build
 ```
 
 **Flags:**
 
-- `--release, -r` - Build with release optimizations (smaller WASM, slower build)
-- `--verbose, -v` - Show detailed cargo output
+- `--debug` - Build in debug mode (faster, larger WASM)
 
 **Examples:**
 
 ```bash
-# Development build (faster, larger WASM)
-bedrock flint build
-
 # Production build (optimized, smaller WASM)
-bedrock flint build --release
+bedrock build
 
-# Verbose output for debugging
-bedrock flint build --verbose
+# Development build (faster, larger WASM)
+bedrock build --debug
 ```
 
 **What it does:**
@@ -48,30 +44,10 @@ bedrock flint build --verbose
 4. Compiles Rust to WASM using cargo
 5. Reports build results (path, size, duration)
 
-**Output (Debug build):**
-
-```
-Flint - Building smart contract
-   Mode: Debug
-   Source: contract/src/lib.rs
-
- Compiling Rust → WASM...
-   Compiling xrpl-contract v0.1.0 (/path/to/contract)
-    Finished dev [unoptimized + debuginfo] target(s) in 2.34s
-
-✓ Build completed successfully!
-
-Output:   contract/target/wasm32-unknown-unknown/debug/xrpl_contract.wasm
-Size:     1.2 MB
-Duration: 2.3s
-
-Tip: Use --release flag for optimized builds
-```
-
 **Output (Release build):**
 
 ```
-Flint - Building smart contract
+Building smart contract...
    Mode: Release (optimized)
    Source: contract/src/lib.rs
 
@@ -88,6 +64,26 @@ Duration: 5.1s
 Built with release optimizations (smaller size, slower build)
 ```
 
+**Output (Debug build):**
+
+```
+Building smart contract...
+   Mode: Debug
+   Source: contract/src/lib.rs
+
+ Compiling Rust → WASM...
+   Compiling xrpl-contract v0.1.0 (/path/to/contract)
+    Finished dev [unoptimized + debuginfo] target(s) in 2.34s
+
+✓ Build completed successfully!
+
+Output:   contract/target/wasm32-unknown-unknown/debug/xrpl_contract.wasm
+Size:     1.2 MB
+Duration: 2.3s
+
+Tip: Use default build for optimized builds
+```
+
 **Requirements:**
 
 - Rust toolchain installed (`cargo`, `rustc`)
@@ -96,44 +92,13 @@ Built with release optimizations (smaller size, slower build)
 
 ---
 
-### `bedrock flint clean`
-
-Removes all build artifacts and compiled files.
-
-```bash
-bedrock flint clean
-```
-
-**What it does:**
-
-1. Runs `cargo clean` in the contract directory
-2. Removes `contract/target/` directory and all contents
-
-**Output:**
-
-```
-Cleaning build artifacts...
-
-✓ Build artifacts cleaned!
-```
-
-**Use cases:**
-
-- Free up disk space
-- Force full rebuild
-- Clean before distribution
-- Troubleshoot build issues
-
----
-
 ## Configuration
 
-Flint reads build settings from `bedrock.toml`:
+Bedrock reads build settings from `bedrock.toml`:
 
 ```toml
 [build]
 source = "contract/src/lib.rs"
-output = "contract/target/wasm32-unknown-unknown/release"
 target = "wasm32-unknown-unknown"
 ```
 
@@ -142,10 +107,7 @@ target = "wasm32-unknown-unknown"
 | Option   | Description                  | Default                                          |
 | -------- | ---------------------------- | ------------------------------------------------ |
 | `source` | Path to contract source file | `contract/src/lib.rs`                            |
-| `output` | Build output directory       | `contract/target/wasm32-unknown-unknown/release` |
 | `target` | Rust compilation target      | `wasm32-unknown-unknown`                         |
-
-**Note:** In the MVP, `source` and `target` are informational. Flint always builds from the `contract/` directory using cargo's default behavior.
 
 ---
 
@@ -183,8 +145,6 @@ crate-type = ["cdylib"]    # Required for WASM
 
 [dependencies]
 # Your XRPL dependencies
-xrpl-wasm-std = { path = "../xrpl-wasm-std" }
-xrpl-wasm-macro = { path = "../xrpl-wasm-macro" }
 
 [profile.release]
 opt-level = "z"            # Optimize for size
@@ -205,30 +165,10 @@ panic = "abort"            # Smaller panic handler
 
 ## Build Modes
 
-### Debug Build (Default)
+### Release Build (Default)
 
 ```bash
-bedrock flint build
-```
-
-**Characteristics:**
-
-- ✅ Fast compilation (~2-5 seconds)
-- ✅ Includes debug symbols
-- ✅ Better error messages
-- ❌ Large WASM file (1-2 MB)
-- ❌ Not optimized
-
-**Use for:**
-
-- Rapid development iteration
-- Debugging contract logic
-- Testing locally
-
-### Release Build
-
-```bash
-bedrock flint build --release
+bedrock build
 ```
 
 **Characteristics:**
@@ -245,6 +185,26 @@ bedrock flint build --release
 - Performance testing
 - Gas optimization
 - Final builds
+
+### Debug Build
+
+```bash
+bedrock build --debug
+```
+
+**Characteristics:**
+
+- ✅ Fast compilation (~2-5 seconds)
+- ✅ Includes debug symbols
+- ✅ Better error messages
+- ❌ Large WASM file (1-2 MB)
+- ❌ Not optimized
+
+**Use for:**
+
+- Rapid development iteration
+- Debugging contract logic
+- Testing locally
 
 **Size comparison:**
 
@@ -272,7 +232,7 @@ cargo --version
 
 ### WASM Target
 
-Flint automatically installs the WASM target if missing:
+Bedrock automatically installs the WASM target if missing:
 
 ```bash
 # This happens automatically, but you can also run manually:
@@ -310,7 +270,7 @@ cd my-contract
 vim contract/src/lib.rs
 
 # Build and test locally
-bedrock flint build
+bedrock build --debug
 
 # Verify WASM was created
 ls -lh contract/target/wasm32-unknown-unknown/debug/*.wasm
@@ -323,26 +283,23 @@ ls -lh contract/target/wasm32-unknown-unknown/debug/*.wasm
 vim contract/src/lib.rs
 
 # Quick build
-bedrock flint build
+bedrock build --debug
 
 # Test deployment (when ready)
-bedrock slate deploy --network local
+bedrock deploy --network local
 ```
 
 ### Preparing for Production
 
 ```bash
-# Clean previous builds
-bedrock flint clean
-
 # Build optimized version
-bedrock flint build --release
+bedrock build
 
 # Verify size
 ls -lh contract/target/wasm32-unknown-unknown/release/*.wasm
 
 # Deploy to testnet
-bedrock slate deploy --network alphanet --save
+bedrock deploy --network alphanet
 ```
 
 ---
@@ -360,17 +317,11 @@ std = []
 debug-mode = []
 ```
 
-Currently, flint uses cargo defaults. To use custom features, you can run cargo directly:
+Currently, bedrock build uses cargo defaults. To use custom features, you can run cargo directly:
 
 ```bash
 cd contract
 cargo build --target wasm32-unknown-unknown --release --no-default-features
-```
-
-**Future enhancement:** Flint will support feature flags:
-
-```bash
-bedrock flint build --release --features debug-mode --no-default-features
 ```
 
 ### Build Scripts
@@ -380,8 +331,7 @@ For complex builds, you can create a build script:
 ```bash
 # build.sh
 #!/bin/bash
-bedrock flint clean
-bedrock flint build --release
+bedrock build
 # Post-process WASM
 wasm-opt contract/target/wasm32-unknown-unknown/release/*.wasm -Oz -o optimized.wasm
 ```
@@ -514,7 +464,7 @@ cargo build --target wasm32-unknown-unknown  # Test build
 
 1. Check `Cargo.toml` has `crate-type = ["cdylib"]`
 2. Ensure you have a `lib.rs` (not just `main.rs`)
-3. Run `bedrock flint build --verbose` to see cargo output
+3. Run `bedrock build --debug` to see cargo output
 
 ### Build is Very Slow
 
@@ -531,10 +481,10 @@ cargo build --target wasm32-unknown-unknown  # Test build
 
 ## Comparison with Direct Cargo
 
-### Using Flint
+### Using `bedrock build`
 
 ```bash
-bedrock flint build --release
+bedrock build
 ```
 
 ✅ Validates toolchain
@@ -556,20 +506,20 @@ cargo build --target wasm32-unknown-unknown --release
 ❌ Manual target specification
 ❌ No validation
 
-**Both are valid!** Use flint for convenience, cargo for advanced needs.
+**Both are valid!** Use `bedrock build` for convenience, cargo for advanced needs.
 
 ---
 
 ## Under the Hood
 
-Flint essentially runs:
+`bedrock build` essentially runs:
 
 ```bash
+# For release (default)
+cargo build --target wasm32-unknown-unknown --release
+
 # For debug
 cargo build --target wasm32-unknown-unknown
-
-# For release
-cargo build --target wasm32-unknown-unknown --release
 ```
 
 **Additional steps:**
@@ -588,7 +538,7 @@ cargo build --target wasm32-unknown-unknown --release
 
 ## Future Enhancements
 
-Planned features for flint:
+Planned features for `bedrock build`:
 
 - [ ] Watch mode (`--watch`) for auto-rebuild
 - [ ] Custom feature flags (`--features`)
@@ -604,8 +554,7 @@ Planned features for flint:
 
 ## See Also
 
-- [Basalt - Local Node Management](./basalt.md)
-- [Quartz - ABI Generation](./quartz.md)
-- [Slate - Contract Deployment](./slate.md)
-- [Writing XRPL Smart Contracts](./writing-contracts.md)
-- [bedrock.toml Configuration Reference](./config-reference.md)
+- [Local Node Management](./local-node.md)
+- [Deploying and Calling Contracts](./deployment-and-calling.md)
+- [ABI Generation](./abi-generation.md)
+- [Wallet Management](./wallet.md)
