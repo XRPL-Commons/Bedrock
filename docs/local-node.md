@@ -1,10 +1,10 @@
-# Basalt - Local Node Management
+# Local Node Management
 
-**Basalt** manages local XRPL nodes using Docker, providing a fast development environment for testing smart contracts.
+**Bedrock** manages local XRPL nodes using Docker, providing a fast development environment for testing smart contracts.
 
 ## Overview
 
-Basalt wraps Docker to run a local XRPL node (rippled) with:
+Bedrock's local node functionality wraps Docker to run a local XRPL node (rippled) with:
 
 - Pre-configured genesis ledger
 - Pre-funded test accounts
@@ -13,12 +13,12 @@ Basalt wraps Docker to run a local XRPL node (rippled) with:
 
 ## Commands
 
-### `bedrock basalt start`
+### `bedrock node start`
 
 Starts a local XRPL node in a Docker container.
 
 ```bash
-bedrock basalt start
+bedrock node start
 ```
 
 **What it does:**
@@ -32,7 +32,7 @@ bedrock basalt start
 **Output:**
 
 ```
-   Starting local XRPL node (basalt)...
+   Starting local XRPL node...
    Docker image: transia/alphanet:latest
    Config dir: .bedrock/node-config
 
@@ -42,8 +42,8 @@ Node endpoints:
   WebSocket: ws://localhost:6006
   RPC:       http://localhost:5005
 
-Use 'bedrock basalt status' to check node status
-Use 'bedrock basalt stop' to stop the node
+Use 'bedrock node status' to check node status
+Use 'bedrock node stop' to stop the node
 ```
 
 **Requirements:**
@@ -59,12 +59,12 @@ Use 'bedrock basalt stop' to stop the node
 
 ---
 
-### `bedrock basalt stop`
+### `bedrock node stop`
 
 Stops and removes the local XRPL node container.
 
 ```bash
-bedrock basalt stop
+bedrock node stop
 ```
 
 **What it does:**
@@ -84,18 +84,18 @@ Stopping local XRPL node...
 
 ---
 
-### `bedrock basalt status`
+### `bedrock node status`
 
 Shows the current status of the local node.
 
 ```bash
-bedrock basalt status
+bedrock node status
 ```
 
 **Output (when running):**
 
 ```
-Basalt - Local XRPL Node Status
+Local XRPL Node Status
 ===================================
 Status:      Running ✓
 Container:   a1b2c3d4e5f6
@@ -113,18 +113,18 @@ Endpoints:
 **Output (when stopped):**
 
 ```
-Basalt - Local XRPL Node Status
+Local XRPL Node Status
 ===================================
 Status:      Stopped
 
-Start the node with: bedrock basalt start
+Start the node with: bedrock node start
 ```
 
 ---
 
 ## Configuration
 
-Basalt reads its configuration from `bedrock.toml` in your project root:
+The local node reads its configuration from `bedrock.toml` in your project root:
 
 ```toml
 [local_node]
@@ -191,7 +191,7 @@ Defines the initial ledger state, including:
 
 ## Docker Image
 
-Basalt uses Docker images that contain a pre-configured rippled binary. By default, it uses `transia/alphanet:latest`.
+The local node uses Docker images that contain a pre-configured rippled binary. By default, it uses `transia/alphanet:latest`.
 
 ### Using a Custom Image
 
@@ -220,10 +220,10 @@ bedrock init my-contract
 cd my-contract
 
 # Start local node
-bedrock basalt start
+bedrock node start
 
 # Verify it's running
-bedrock basalt status
+bedrock node status
 
 # Use the node
 # WebSocket: ws://localhost:6006
@@ -233,10 +233,10 @@ bedrock basalt status
 
 ```bash
 # Stop current instance
-bedrock basalt stop
+bedrock node stop
 
 # Start fresh
-bedrock basalt start
+bedrock node start
 ```
 
 ### Connecting from Your Code
@@ -283,8 +283,8 @@ const client = new Client(cfg.networks.local.url);
 **Solution:**
 
 ```bash
-bedrock basalt stop
-bedrock basalt start
+bedrock node stop
+bedrock node start
 ```
 
 Or manually remove:
@@ -332,7 +332,7 @@ docker rm bedrock-xrpl-node
 
 ### Container Management
 
-Basalt manages a Docker container named `bedrock-xrpl-node`:
+The local node functionality manages a Docker container named `bedrock-xrpl-node`:
 
 - Single instance per machine
 - Auto-remove is disabled (allows restart)
@@ -353,51 +353,8 @@ Host          Container
 
 - `.bedrock/node-config/genesis.json` → `/genesis.json` (read-only)
 
-Future versions may support:
 
-- Custom rippled.cfg
-- Persistent ledger data
-- Log directories
-
----
-
-## Comparison with Other Tools
-
-### Basalt vs. Anvil (Foundry)
-
-| Feature       | Basalt (XRPL)    | Anvil (Ethereum) |
-| ------------- | ---------------- | ---------------- |
-| **Runtime**   | Docker (rippled) | Native binary    |
-| **Speed**     | ~3-5s startup    | ~1s startup      |
-| **Isolation** | Container        | Process          |
-| **Config**    | genesis.json     | CLI flags        |
-| **State**     | Configurable     | In-memory        |
-
-**Why Docker?**
-
-- Rippled is complex to compile (takes hours)
-- Docker provides consistent environment across platforms
-- Easy to distribute and update
-
----
-
-## Future Enhancements
-
-Planned features for basalt:
-
-- [ ] Custom port mapping
-- [ ] Persistent ledger data (survive restarts)
-- [ ] Snapshot/restore functionality
-- [ ] Network forking (clone mainnet/testnet state)
-- [ ] Multiple nodes (simulate network)
-- [ ] Log streaming (`bedrock basalt logs`)
-- [ ] Resource limits (CPU, memory)
-- [ ] Health checks and auto-restart
-
----
-
-## See Also
-
-- [Flint - Building Contracts](./flint.md)
-- [Slate - Deploying Contracts](./slate.md)
-- [bedrock.toml Configuration Reference](./config-reference.md)
+- [Building Contracts](./building-contracts.md)
+- [Deploying and Calling Contracts](./deployment-and-calling.md)
+- [ABI Generation](./abi-generation.md)
+- [Wallet Management](./wallet.md)
