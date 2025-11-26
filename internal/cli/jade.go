@@ -8,6 +8,10 @@ import (
 	"github.com/xrpl-bedrock/bedrock/pkg/wallet"
 )
 
+var (
+	jadeAlgorithm string
+)
+
 var jadeCmd = &cobra.Command{
 	Use:   "jade",
 	Short: "Wallet management for XRPL",
@@ -34,11 +38,15 @@ The wallet will be encrypted and stored securely on disk.`,
 			os.Exit(1)
 		}
 
-		xrplWallet := wallet.NewXRPLWallet()
+		xrplWallet, err := wallet.NewXRPLWallet()
+		if err != nil {
+			fmt.Printf("Error: Failed to initialize XRPL wallet: %v\n", err)
+			os.Exit(1)
+		}
 		authProvider := wallet.NewAuthProvider()
 
 		// Generate new wallet
-		newWallet, err := xrplWallet.GenerateWallet(walletName)
+		newWallet, err := xrplWallet.GenerateWalletWithAlgorithm(walletName, jadeAlgorithm)
 		if err != nil {
 			fmt.Printf("Error: Failed to generate wallet: %v\n", err)
 			os.Exit(1)
@@ -86,7 +94,11 @@ The seed input will be hidden for security.`,
 			os.Exit(1)
 		}
 
-		xrplWallet := wallet.NewXRPLWallet()
+		xrplWallet, err := wallet.NewXRPLWallet()
+		if err != nil {
+			fmt.Printf("Error: Failed to initialize XRPL wallet: %v\n", err)
+			os.Exit(1)
+		}
 		authProvider := wallet.NewAuthProvider()
 
 		// Get seed (hidden input)
@@ -102,7 +114,7 @@ The seed input will be hidden for security.`,
 		}
 
 		// Import wallet
-		importedWallet, err := xrplWallet.ImportWallet(walletName, seed)
+		importedWallet, err := xrplWallet.ImportWalletWithAlgorithm(walletName, seed, jadeAlgorithm)
 		if err != nil {
 			fmt.Printf("Error: Failed to import wallet: %v\n", err)
 			os.Exit(1)
@@ -260,6 +272,10 @@ func init() {
 	jadeCmd.AddCommand(jadeListCmd)
 	jadeCmd.AddCommand(jadeExportCmd)
 	jadeCmd.AddCommand(jadeRemoveCmd)
+
+	// Add flags to commands that need algorithm selection
+	jadeNewCmd.Flags().StringVarP(&jadeAlgorithm, "algorithm", "a", "secp256k1", "Cryptographic algorithm (secp256k1, ed25519)")
+	jadeImportCmd.Flags().StringVarP(&jadeAlgorithm, "algorithm", "a", "secp256k1", "Cryptographic algorithm (secp256k1, ed25519)")
 
 	// Add jade to root command
 	rootCmd.AddCommand(jadeCmd)

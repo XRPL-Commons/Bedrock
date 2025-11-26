@@ -1,44 +1,72 @@
 package wallet
 
 import (
-	"crypto/rand"
-	"crypto/sha256"
+	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
 
 	"github.com/btcsuite/btcutil/base58"
+	"github.com/xrpl-bedrock/bedrock/pkg/adapter"
 )
 
 // XRPLWallet provides XRPL-specific wallet functionality
-type XRPLWallet struct{}
-
-// NewXRPLWallet creates a new XRPL wallet helper
-func NewXRPLWallet() *XRPLWallet {
-	return &XRPLWallet{}
+type XRPLWallet struct {
+	executor *adapter.Executor
 }
 
-// GenerateWallet creates a new XRPL wallet with random seed
-func (x *XRPLWallet) GenerateWallet(name string) (*Wallet, error) {
-	// Generate 16 bytes of entropy for the seed
-	entropy := make([]byte, 16)
-	if _, err := rand.Read(entropy); err != nil {
-		return nil, fmt.Errorf("failed to generate entropy: %w", err)
+// NewXRPLWallet creates a new XRPL wallet helper
+func NewXRPLWallet() (*XRPLWallet, error) {
+	executor, err := adapter.NewExecutor(false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create executor: %w", err)
 	}
 
-	// Create seed in XRPL format (s + base58)
-	seed := "s" + base58.Encode(entropy)
+	return &XRPLWallet{
+		executor: executor,
+	}, nil
+}
 
-	// Derive address from seed
-	address, err := x.SeedToAddress(seed)
+// GenerateWallet creates a new XRPL wallet with random seed using proper XRPL cryptography
+func (x *XRPLWallet) GenerateWallet(name string) (*Wallet, error) {
+	return x.GenerateWalletWithAlgorithm(name, "secp256k1")
+}
+
+// GenerateWalletWithAlgorithm creates a new XRPL wallet with specified algorithm
+func (x *XRPLWallet) GenerateWalletWithAlgorithm(name, algorithm string) (*Wallet, error) {
+	// Use JavaScript module for proper XRPL wallet generation
+	jsConfig := map[string]interface{}{
+		"action":    "generate_wallet",
+		"algorithm": algorithm,
+	}
+
+	ctx := context.Background()
+	result, err := x.executor.ExecuteModule(ctx, "wallet.js", jsConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to derive address from seed: %w", err)
+		return nil, fmt.Errorf("failed to generate wallet: %w", err)
+	}
+
+	var walletResult struct {
+		Success   bool   `json:"success"`
+		Error     string `json:"error,omitempty"`
+		Seed      string `json:"seed"`
+		Address   string `json:"address"`
+		PublicKey string `json:"public_key"`
+	}
+
+	if err := json.Unmarshal(result.Data, &walletResult); err != nil {
+		return nil, fmt.Errorf("failed to parse wallet result: %w", err)
+	}
+
+	if !walletResult.Success {
+		return nil, fmt.Errorf("wallet generation failed: %s", walletResult.Error)
 	}
 
 	return &Wallet{
 		Name:    name,
-		Address: address,
-		Seed:    seed,
+		Address: walletResult.Address,
+		Seed:    walletResult.Seed,
 	}, nil
 }
 
@@ -67,27 +95,46 @@ func (x *XRPLWallet) ValidateSeed(seed string) error {
 	return nil
 }
 
-// SeedToAddress derives an XRPL address from a seed
+// SeedToAddress derives an XRPL address from a seed using proper XRPL cryptography
 func (x *XRPLWallet) SeedToAddress(seed string) (string, error) {
+	return x.SeedToAddressWithAlgorithm(seed, "secp256k1")
+}
+
+// SeedToAddressWithAlgorithm derives an XRPL address from a seed using specified algorithm
+func (x *XRPLWallet) SeedToAddressWithAlgorithm(seed, algorithm string) (string, error) {
 	if err := x.ValidateSeed(seed); err != nil {
 		return "", err
 	}
 
-	// For now, we'll generate a mock address since full XRPL key derivation
-	// requires the complete cryptographic implementation
-	// In production, this would use proper XRPL key derivation
-	seedBytes := []byte(seed)
-	hash := sha256.Sum256(seedBytes)
-	
-	// Take first 20 bytes and create a mock XRPL address
-	addressBytes := hash[:20]
-	
-	// Add XRPL address prefix (0x00) and checksum
-	payload := append([]byte{0x00}, addressBytes...)
-	checksum := x.calculateChecksum(payload)
-	fullAddress := append(payload, checksum...)
-	
-	return "r" + base58.Encode(fullAddress), nil
+	// Use JavaScript module for proper XRPL address derivation
+	jsConfig := map[string]interface{}{
+		"action":    "derive_address",
+		"seed":      seed,
+		"algorithm": algorithm,
+	}
+
+	ctx := context.Background()
+	result, err := x.executor.ExecuteModule(ctx, "wallet.js", jsConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to derive address: %w", err)
+	}
+
+	var walletResult struct {
+		Success   bool   `json:"success"`
+		Error     string `json:"error,omitempty"`
+		Address   string `json:"address"`
+		PublicKey string `json:"public_key"`
+	}
+
+	if err := json.Unmarshal(result.Data, &walletResult); err != nil {
+		return "", fmt.Errorf("failed to parse wallet result: %w", err)
+	}
+
+	if !walletResult.Success {
+		return "", fmt.Errorf("wallet derivation failed: %s", walletResult.Error)
+	}
+
+	return walletResult.Address, nil
 }
 
 // ValidateAddress checks if an address is in valid XRPL format
@@ -111,11 +158,16 @@ func (x *XRPLWallet) ValidateAddress(address string) error {
 
 // ImportWallet creates a wallet from an existing seed
 func (x *XRPLWallet) ImportWallet(name, seed string) (*Wallet, error) {
+	return x.ImportWalletWithAlgorithm(name, seed, "secp256k1")
+}
+
+// ImportWalletWithAlgorithm creates a wallet from an existing seed with specified algorithm
+func (x *XRPLWallet) ImportWalletWithAlgorithm(name, seed, algorithm string) (*Wallet, error) {
 	if err := x.ValidateSeed(seed); err != nil {
 		return nil, fmt.Errorf("invalid seed: %w", err)
 	}
 
-	address, err := x.SeedToAddress(seed)
+	address, err := x.SeedToAddressWithAlgorithm(seed, algorithm)
 	if err != nil {
 		return nil, fmt.Errorf("failed to derive address: %w", err)
 	}
@@ -127,9 +179,3 @@ func (x *XRPLWallet) ImportWallet(name, seed string) (*Wallet, error) {
 	}, nil
 }
 
-// calculateChecksum calculates a simple checksum for address generation
-func (x *XRPLWallet) calculateChecksum(payload []byte) []byte {
-	hash1 := sha256.Sum256(payload)
-	hash2 := sha256.Sum256(hash1[:])
-	return hash2[:4]
-}

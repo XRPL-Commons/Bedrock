@@ -36,7 +36,10 @@ func (wr *WalletResolver) ResolveWallet(walletInput string) (string, error) {
 
 	// If input starts with 's', treat as raw seed
 	if strings.HasPrefix(walletInput, "s") {
-		xrplWallet := NewXRPLWallet()
+		xrplWallet, err := NewXRPLWallet()
+		if err != nil {
+			return "", fmt.Errorf("failed to create XRPL wallet: %w", err)
+		}
 		if err := xrplWallet.ValidateSeed(walletInput); err != nil {
 			return "", fmt.Errorf("invalid seed format: %w", err)
 		}

@@ -15,11 +15,12 @@ import (
 )
 
 var (
-	deployNetwork    string
-	deployWallet     string
-	deployABI        string
-	deploySkipBuild  bool
-	deploySkipABI    bool
+	deployNetwork   string
+	deployWallet    string
+	deployABI       string
+	deploySkipBuild bool
+	deploySkipABI   bool
+	deployAlgorithm string
 )
 
 var deployCmd = &cobra.Command{
@@ -44,6 +45,7 @@ func init() {
 	deployCmd.Flags().StringVarP(&deployABI, "abi", "a", "abi.json", "Path to ABI file")
 	deployCmd.Flags().BoolVar(&deploySkipBuild, "skip-build", false, "Skip building the contract")
 	deployCmd.Flags().BoolVar(&deploySkipABI, "skip-abi", false, "Skip generating ABI")
+	deployCmd.Flags().StringVar(&deployAlgorithm, "algorithm", "secp256k1", "Cryptographic algorithm (secp256k1, ed25519)")
 }
 
 func runDeploy(cmd *cobra.Command, args []string) error {
@@ -202,6 +204,7 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		ABIPath:    abiPath,
 		NetworkURL: networkCfg.URL,
 		WalletSeed: walletSeed,
+		Algorithm:  deployAlgorithm,
 		FaucetURL:  faucetURL,
 	})
 

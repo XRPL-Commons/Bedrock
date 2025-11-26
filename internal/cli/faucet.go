@@ -10,9 +10,10 @@ import (
 )
 
 var (
-	faucetNetwork string
-	faucetWallet  string
-	faucetAddress string
+	faucetNetwork   string
+	faucetWallet    string
+	faucetAddress   string
+	faucetAlgorithm string
 )
 
 var faucetCmd = &cobra.Command{
@@ -35,6 +36,7 @@ func init() {
 	faucetCmd.Flags().StringVarP(&faucetNetwork, "network", "n", "alphanet", "Network to use (local, alphanet, testnet, mainnet)")
 	faucetCmd.Flags().StringVarP(&faucetWallet, "wallet", "w", "", "Wallet seed (optional)")
 	faucetCmd.Flags().StringVarP(&faucetAddress, "address", "a", "", "Wallet address (optional)")
+	faucetCmd.Flags().StringVar(&faucetAlgorithm, "algorithm", "secp256k1", "Cryptographic algorithm (secp256k1, ed25519)")
 }
 
 func runFaucet(cmd *cobra.Command, args []string) error {
@@ -96,6 +98,7 @@ func runFaucet(cmd *cobra.Command, args []string) error {
 		FaucetURL:     networkCfg.FaucetURL,
 		WalletSeed:    faucetWallet,
 		WalletAddress: faucetAddress,
+		Algorithm:     faucetAlgorithm,
 		NetworkURL:    networkCfg.URL,
 	})
 

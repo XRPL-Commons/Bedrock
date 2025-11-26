@@ -13,13 +13,14 @@ import (
 )
 
 var (
-	callNetwork   string
-	callWallet    string
-	callABI       string
-	callParams    string
+	callNetwork    string
+	callWallet     string
+	callABI        string
+	callParams     string
 	callParamsFile string
-	callGas       string
-	callFee       string
+	callGas        string
+	callFee        string
+	callAlgorithm  string
 )
 
 var callCmd = &cobra.Command{
@@ -45,6 +46,7 @@ func init() {
 	callCmd.Flags().StringVarP(&callParamsFile, "params-file", "f", "", "Parameters from JSON file")
 	callCmd.Flags().StringVarP(&callGas, "gas", "g", "1000000", "Computation allowance")
 	callCmd.Flags().StringVar(&callFee, "fee", "1000000", "Transaction fee in drops")
+	callCmd.Flags().StringVar(&callAlgorithm, "algorithm", "secp256k1", "Cryptographic algorithm (secp256k1, ed25519)")
 
 	callCmd.MarkFlagRequired("wallet")
 }
@@ -134,6 +136,7 @@ func runCall(cmd *cobra.Command, args []string) error {
 		NetworkURL:           networkCfg.URL,
 		NetworkID:            networkCfg.NetworkID,
 		WalletSeed:           walletSeed,
+		Algorithm:            callAlgorithm,
 		ABIPath:              callABI,
 		Parameters:           params,
 		ComputationAllowance: callGas,
