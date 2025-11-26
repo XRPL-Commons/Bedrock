@@ -7,18 +7,20 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"github.com/xrpl-bedrock/bedrock/pkg/caller"
-	"github.com/xrpl-bedrock/bedrock/pkg/config"
+	"github.com/xrpl-commons/bedrock/pkg/caller"
+	"github.com/xrpl-commons/bedrock/pkg/config"
+	"github.com/xrpl-commons/bedrock/pkg/wallet"
 )
 
 var (
-	callNetwork   string
-	callWallet    string
-	callABI       string
-	callParams    string
+	callNetwork    string
+	callWallet     string
+	callABI        string
+	callParams     string
 	callParamsFile string
-	callGas       string
-	callFee       string
+	callGas        string
+	callFee        string
+	callAlgorithm  string
 )
 
 var callCmd = &cobra.Command{
@@ -38,12 +40,13 @@ func init() {
 	rootCmd.AddCommand(callCmd)
 
 	callCmd.Flags().StringVarP(&callNetwork, "network", "n", "alphanet", "Network to call on (local, alphanet, testnet, mainnet)")
-	callCmd.Flags().StringVarP(&callWallet, "wallet", "w", "", "Wallet seed (required)")
+	callCmd.Flags().StringVarP(&callWallet, "wallet", "w", "", "Wallet seed or name (required)")
 	callCmd.Flags().StringVarP(&callABI, "abi", "a", "abi.json", "Path to ABI file")
 	callCmd.Flags().StringVarP(&callParams, "params", "p", "", "Parameters as JSON string")
 	callCmd.Flags().StringVarP(&callParamsFile, "params-file", "f", "", "Parameters from JSON file")
 	callCmd.Flags().StringVarP(&callGas, "gas", "g", "1000000", "Computation allowance")
 	callCmd.Flags().StringVar(&callFee, "fee", "1000000", "Transaction fee in drops")
+	callCmd.Flags().StringVar(&callAlgorithm, "algorithm", "secp256k1", "Cryptographic algorithm (secp256k1, ed25519)")
 
 	callCmd.MarkFlagRequired("wallet")
 }
@@ -100,6 +103,19 @@ func runCall(cmd *cobra.Command, args []string) error {
 		fmt.Printf("   Parameters: (none)\n")
 	}
 
+	// Resolve wallet seed
+	resolver, err := wallet.NewWalletResolver()
+	if err != nil {
+		color.Red("✗ Failed to initialize wallet resolver: %v\n", err)
+		return err
+	}
+
+	walletSeed, err := resolver.ResolveWallet(callWallet)
+	if err != nil {
+		color.Red("✗ Failed to resolve wallet: %v\n", err)
+		return err
+	}
+
 	fmt.Println()
 
 	// Create caller
@@ -119,7 +135,8 @@ func runCall(cmd *cobra.Command, args []string) error {
 		FunctionName:         functionName,
 		NetworkURL:           networkCfg.URL,
 		NetworkID:            networkCfg.NetworkID,
-		WalletSeed:           callWallet,
+		WalletSeed:           walletSeed,
+		Algorithm:            callAlgorithm,
 		ABIPath:              callABI,
 		Parameters:           params,
 		ComputationAllowance: callGas,

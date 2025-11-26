@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/xrpl-bedrock/bedrock/embedded"
+	"github.com/xrpl-commons/bedrock/embedded"
 )
 
 // Executor handles execution of embedded JavaScript modules

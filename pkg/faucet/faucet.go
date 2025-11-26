@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/xrpl-bedrock/bedrock/pkg/adapter"
+	"github.com/xrpl-commons/bedrock/pkg/adapter"
 )
 
 // Faucet handles requesting funds from XRPL faucets
@@ -34,6 +34,7 @@ func (f *Faucet) Request(ctx context.Context, config FaucetConfig) (*FaucetResul
 		"faucet_url":     config.FaucetURL,
 		"wallet_seed":    config.WalletSeed,
 		"wallet_address": config.WalletAddress,
+		"algorithm":      config.Algorithm,
 		"network_url":    config.NetworkURL,
 		"verbose":        f.verbose,
 	}

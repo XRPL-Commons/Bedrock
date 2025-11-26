@@ -5,7 +5,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"github.com/xrpl-bedrock/bedrock/embedded"
+	"github.com/xrpl-commons/bedrock/embedded"
 )
 
 var cleanCmd = &cobra.Command{

@@ -14,5 +14,6 @@ type FaucetConfig struct {
 	FaucetURL     string
 	WalletSeed    string
 	WalletAddress string
+	Algorithm     string
 	NetworkURL    string
 }

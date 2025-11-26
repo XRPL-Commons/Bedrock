@@ -165,9 +165,10 @@ async function deployContract(config) {
     log('✓ Connected to network');
 
     // Create or restore wallet
+    const algorithm = config.algorithm === 'ed25519' ? undefined : xrpl.ECDSA.secp256k1;
     const wallet = wallet_seed
-      ? xrpl.Wallet.fromSeed(wallet_seed, { algorithm: xrpl.ECDSA.secp256k1 })
-      : xrpl.Wallet.generate(xrpl.ECDSA.secp256k1);
+      ? (algorithm ? xrpl.Wallet.fromSeed(wallet_seed, { algorithm }) : xrpl.Wallet.fromSeed(wallet_seed))
+      : (algorithm ? xrpl.Wallet.generate(algorithm) : xrpl.Wallet.generate());
 
     log('\nWallet:');
     log('  Address:', wallet.address);

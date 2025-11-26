@@ -17,6 +17,7 @@ type DeploymentConfig struct {
 	ABIPath    string
 	NetworkURL string
 	WalletSeed string
+	Algorithm  string
 	FaucetURL  string
 	Fee        string
 }

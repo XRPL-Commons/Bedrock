@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/xrpl-bedrock/bedrock/pkg/adapter"
+	"github.com/xrpl-commons/bedrock/pkg/adapter"
 )
 
 // Deployer handles contract deployment via embedded Node.js module
@@ -34,6 +34,7 @@ func (d *Deployer) Deploy(ctx context.Context, config DeploymentConfig) (*Deploy
 		"wasm_path":   config.WasmPath,
 		"abi_path":    config.ABIPath,
 		"network_url": config.NetworkURL,
+		"algorithm":   config.Algorithm,
 		"verbose":     d.verbose,
 	}
 

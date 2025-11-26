@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/xrpl-bedrock/bedrock/internal/cli"
+	"github.com/xrpl-commons/bedrock/internal/cli"
 )
 
 func main() {

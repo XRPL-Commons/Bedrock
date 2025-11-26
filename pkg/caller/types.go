@@ -18,6 +18,7 @@ type CallConfig struct {
 	NetworkURL           string
 	NetworkID            uint32
 	WalletSeed           string
+	Algorithm            string
 	ABIPath              string
 	Parameters           map[string]interface{} // JSON parameters
 	ComputationAllowance string
