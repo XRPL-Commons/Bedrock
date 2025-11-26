@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/xrpl-bedrock/bedrock/pkg/adapter"
+	"github.com/xrpl-commons/bedrock/pkg/adapter"
 )
 
 // Faucet handles requesting funds from XRPL faucets

@@ -5,8 +5,8 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"github.com/xrpl-bedrock/bedrock/pkg/config"
-	"github.com/xrpl-bedrock/bedrock/pkg/faucet"
+	"github.com/xrpl-commons/bedrock/pkg/config"
+	"github.com/xrpl-commons/bedrock/pkg/faucet"
 )
 
 var (

@@ -1,4 +1,4 @@
-module github.com/xrpl-bedrock/bedrock
+module github.com/xrpl-commons/bedrock
 
 go 1.24.4
 

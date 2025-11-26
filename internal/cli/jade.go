@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/xrpl-bedrock/bedrock/pkg/wallet"
+	"github.com/xrpl-commons/bedrock/pkg/wallet"
 )
 
 var (
@@ -69,7 +69,6 @@ The wallet will be encrypted and stored securely on disk.`,
 			fmt.Printf("Error: Failed to save wallet: %v\n", err)
 			os.Exit(1)
 		}
-
 
 		fmt.Printf("✅ Wallet '%s' created successfully\n", walletName)
 		fmt.Printf("   Address: %s\n", newWallet.Address)
@@ -137,7 +136,6 @@ The seed input will be hidden for security.`,
 			fmt.Printf("Error: Failed to save wallet: %v\n", err)
 			os.Exit(1)
 		}
-
 
 		fmt.Printf("✅ Wallet '%s' imported successfully\n", walletName)
 		fmt.Printf("   Address: %s\n", importedWallet.Address)
@@ -259,7 +257,6 @@ This action cannot be undone. Make sure you have backed up the seed if needed.`,
 			fmt.Printf("Error: Failed to remove wallet: %v\n", err)
 			os.Exit(1)
 		}
-
 
 		fmt.Printf("✅ Wallet '%s' removed successfully\n", walletName)
 	},

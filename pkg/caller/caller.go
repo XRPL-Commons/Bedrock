@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/xrpl-bedrock/bedrock/pkg/adapter"
+	"github.com/xrpl-commons/bedrock/pkg/adapter"
 )
 
 // Caller handles contract function calls via embedded Node.js module
