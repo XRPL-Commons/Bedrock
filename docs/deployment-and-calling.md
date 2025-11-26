@@ -106,12 +106,3 @@ bedrock call rContract123... register \
   --wallet sXXX... \
   --params-file params.json
 ```
-
----
-
-## See Also
-
-- [Local Node Management](./local-node.md)
-- [Building Contracts](./building-contracts.md)
-- [ABI Generation](./abi-generation.md)
-- [Wallet Management](./wallet.md)
