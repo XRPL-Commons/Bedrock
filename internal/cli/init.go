@@ -22,7 +22,7 @@ var initCmd = &cobra.Command{
 var genesisTemplate string
 
 func init() {
-	rootCmd.AddCommand(initCmd)
+	RootCmd.AddCommand(initCmd)
 }
 
 func runInit(cmd *cobra.Command, args []string) error {

@@ -35,7 +35,7 @@ var (
 )
 
 func init() {
-	rootCmd.AddCommand(ledgerDaemonCmd)
+	RootCmd.AddCommand(ledgerDaemonCmd)
 	ledgerDaemonCmd.Flags().StringVar(&daemonRPCURL, "rpc-url", "http://localhost:5005", "RPC URL")
 	ledgerDaemonCmd.Flags().IntVar(&daemonInterval, "interval", 1000, "Interval in milliseconds")
 }

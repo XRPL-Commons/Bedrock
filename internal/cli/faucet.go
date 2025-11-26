@@ -31,7 +31,7 @@ The faucet will send testnet XRP to the specified or generated address.`,
 }
 
 func init() {
-	rootCmd.AddCommand(faucetCmd)
+	RootCmd.AddCommand(faucetCmd)
 
 	faucetCmd.Flags().StringVarP(&faucetNetwork, "network", "n", "alphanet", "Network to use (local, alphanet, testnet, mainnet)")
 	faucetCmd.Flags().StringVarP(&faucetWallet, "wallet", "w", "", "Wallet seed (optional)")

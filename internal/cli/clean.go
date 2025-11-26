@@ -27,7 +27,7 @@ Use this command if you:
 }
 
 func init() {
-	rootCmd.AddCommand(cleanCmd)
+	RootCmd.AddCommand(cleanCmd)
 }
 
 func runClean(cmd *cobra.Command, args []string) error {

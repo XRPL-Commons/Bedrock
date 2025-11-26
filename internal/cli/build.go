@@ -22,7 +22,7 @@ var buildCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(buildCmd)
+	RootCmd.AddCommand(buildCmd)
 
 	buildCmd.Flags().BoolVarP(&buildRelease, "release", "r", true, "Build in release mode (optimized)")
 	buildCmd.Flags().BoolVarP(&buildWatch, "watch", "w", false, "Watch for changes and rebuild")

@@ -41,7 +41,7 @@ Commands:
 }
 
 func init() {
-	rootCmd.AddCommand(nodeCmd)
+	RootCmd.AddCommand(nodeCmd)
 }
 
 func runNode(cmd *cobra.Command, args []string) error {

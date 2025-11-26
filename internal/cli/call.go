@@ -37,7 +37,7 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(callCmd)
+	RootCmd.AddCommand(callCmd)
 
 	callCmd.Flags().StringVarP(&callNetwork, "network", "n", "alphanet", "Network to call on (local, alphanet, testnet, mainnet)")
 	callCmd.Flags().StringVarP(&callWallet, "wallet", "w", "", "Wallet seed or name (required)")

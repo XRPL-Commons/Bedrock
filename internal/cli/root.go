@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var rootCmd = &cobra.Command{
+var RootCmd = &cobra.Command{
 	Use:   "bedrock",
 	Short: "The unshakeable foundation for XRPL smart contracts",
 	Long: `BEDROCK - XRPL Smart Contract CLI
@@ -14,10 +14,10 @@ Build, deploy, and interact with XRPL smart contracts written in Rust.`,
 }
 
 func Execute() error {
-	return rootCmd.Execute()
+	return RootCmd.Execute()
 }
 
 func init() {
 	// Global flags
-	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "verbose output")
+	RootCmd.PersistentFlags().BoolP("verbose", "v", false, "verbose output")
 }

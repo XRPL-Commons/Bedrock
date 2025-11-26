@@ -275,5 +275,5 @@ func init() {
 	jadeImportCmd.Flags().StringVarP(&jadeAlgorithm, "algorithm", "a", "secp256k1", "Cryptographic algorithm (secp256k1, ed25519)")
 
 	// Add jade to root command
-	rootCmd.AddCommand(jadeCmd)
+	RootCmd.AddCommand(jadeCmd)
 }

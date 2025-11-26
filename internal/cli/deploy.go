@@ -38,7 +38,7 @@ Use --skip-build or --skip-abi to skip these steps.`,
 }
 
 func init() {
-	rootCmd.AddCommand(deployCmd)
+	RootCmd.AddCommand(deployCmd)
 
 	deployCmd.Flags().StringVarP(&deployNetwork, "network", "n", "alphanet", "Network to deploy to (local, alphanet, testnet, mainnet)")
 	deployCmd.Flags().StringVarP(&deployWallet, "wallet", "w", "", "Wallet seed or name (generates new if not provided)")
