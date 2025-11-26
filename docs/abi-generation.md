@@ -4,7 +4,7 @@
 
 ## Overview
 
-Smart contracts need ABIs to describe their functions, parameters, and types. Bedrock extracts this information from JSDoc-style comments in your Rust source code, similar to how Ethereum's Solidity compiler generates ABIs.
+Smart contracts need ABIs to describe their functions, parameters, and types. Bedrock extracts this information from JSDoc-style comments in your Rust source code.
 
 Bedrock's ABI generation provides:
 
@@ -20,13 +20,14 @@ WASM binaries only contain function **names**, not parameter types or descriptio
 - Function names
 - Parameter names and types
 - Parameter order
+- Parameter flags
 - Return types
 
 Without an ABI, developers would need to manually maintain this information separately from the code (error-prone and not scalable).
 
 ## Automatic Generation
 
-Bedrock automatically generates the ABI file (`abi.json`) during the `bedrock deploy` process. You no longer need to run a separate command.
+Bedrock automatically generates the ABI file (`abi.json`) during the `bedrock deploy` process. You don't to run a separate command.
 
 ---
 
@@ -196,145 +197,6 @@ Bedrock will **reject** invalid types with helpful error messages during the `de
 
 ---
 
-## Complete Example
-
-### DNS Contract
-
-**contract/src/lib.rs:**
-
-```rust
-use xrpl_wasm_std::core::types::account_id::AccountID;
-use xrpl_wasm_std::core::types::blob::Blob;
-
-/// @xrpl-function register
-/// @param name VL - Domain name to register
-/// @param resolver ACCOUNT - Resolver account address
-/// @param duration UINT64 - Registration duration in seconds
-fn register(name: Blob, resolver: AccountID, duration: u64) -> i32 {
-    // Implementation
-    0
-}
-
-/// @xrpl-function transfer
-/// @param name VL - Domain name to transfer
-/// @param new_owner ACCOUNT - New owner address
-fn transfer(name: Blob, new_owner: AccountID) -> i32 {
-    // Implementation
-    0
-}
-
-/// @xrpl-function resolve
-/// @param name VL - Domain name to resolve
-/// @return ACCOUNT - Resolver address
-fn resolve(name: Blob) -> AccountID {
-    // Implementation
-    AccountID([0u8; 20])
-}
-
-/// @xrpl-function renew
-/// @param name VL - Domain name to renew
-/// @flag 0
-/// @param duration UINT64 - Extension duration (required)
-/// @flag 1
-/// @param auto_renew UINT8 - Enable auto-renewal (optional)
-fn renew(name: Blob, duration: u64, auto_renew: u8) -> i32 {
-    // Implementation
-    0
-}
-```
-
-### Generated ABI
-
-**abi.json:**
-
-```json
-{
-  "contract_name": "dns-contract",
-  "functions": [
-    {
-      "name": "register",
-      "parameters": [
-        {
-          "name": "name",
-          "type": "VL",
-          "flag": 0,
-          "description": "Domain name to register"
-        },
-        {
-          "name": "resolver",
-          "type": "ACCOUNT",
-          "flag": 0,
-          "description": "Resolver account address"
-        },
-        {
-          "name": "duration",
-          "type": "UINT64",
-          "flag": 0,
-          "description": "Registration duration in seconds"
-        }
-      ]
-    },
-    {
-      "name": "transfer",
-      "parameters": [
-        {
-          "name": "name",
-          "type": "VL",
-          "flag": 0,
-          "description": "Domain name to transfer"
-        },
-        {
-          "name": "new_owner",
-          "type": "ACCOUNT",
-          "flag": 0,
-          "description": "New owner address"
-        }
-      ]
-    },
-    {
-      "name": "resolve",
-      "parameters": [
-        {
-          "name": "name",
-          "type": "VL",
-          "flag": 0,
-          "description": "Domain name to resolve"
-        }
-      ],
-      "returns": {
-        "type": "ACCOUNT",
-        "description": "Resolver address"
-      }
-    },
-    {
-      "name": "renew",
-      "parameters": [
-        {
-          "name": "name",
-          "type": "VL",
-          "flag": 0,
-          "description": "Domain name to renew"
-        },
-        {
-          "name": "duration",
-          "type": "UINT64",
-          "flag": 0,
-          "description": "Extension duration (required)"
-        },
-        {
-          "name": "auto_renew",
-          "type": "UINT8",
-          "flag": 1,
-          "description": "Enable auto-renewal (optional)"
-        }
-      ]
-    }
-  ]
-}
-```
-
----
-
 ## Common Workflows
 
 ### Initial Development
@@ -450,23 +312,6 @@ test -f abi.json || exit 1
 
 ---
 
-## Comparison with Ethereum
-
-| Feature                  | Ethereum (Solidity)    | XRPL (Bedrock)         |
-| ------------------------ | ---------------------- | ----------------------------- |
-| **ABI Source**           | Function signatures    | JSDoc annotations             |
-| **Generation**           | Automatic (compiler)   | Automatic (`deploy`)  |
-| **Type System**          | Solidity types         | XRPL STypes                   |
-| **Format**               | JSON                   | JSON            |
-| **Parameter Metadata**   | Limited                | Descriptions, flags           |
-| **Validation**           | Compile-time           | Deploy-time                 |
-
-**Key Difference:**
-
-Solidity's ABI is auto-generated because the language has rich type information. Rust → WASM loses this, so Bedrock uses annotations as the source of truth.
-
----
-
 ## Design Decisions
 
 ### Why Comments Instead of Rust Attributes?
@@ -501,26 +346,3 @@ To get types, you'd need:
 - Name section (names only, not types)
 
 **Annotations are the pragmatic solution.**
-
----
-
-## Future Enhancements
-
-Planned features for ABI generation:
-
-- [ ] Support for struct/enum types in parameters
-- [ ] Rust attribute alternative (`#[xrpl_function]`)
-- [ ] ABI versioning and compatibility checks
-- [ ] TypeScript type generation
-- [ ] ABI diff tool (compare versions)
-- [ ] Integration with contract testing frameworks
-- [ ] Validation against deployed contract
-
----
-
-## See Also
-
-- [Building Contracts](./building-contracts.md)
-- [Deploying and Calling Contracts](./deployment-and-calling.md)
-- [Local Node Management](./local-node.md)
-- [Wallet Management](./wallet.md)
