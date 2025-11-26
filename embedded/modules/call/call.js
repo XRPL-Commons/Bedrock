@@ -262,7 +262,7 @@ async function callContract(config) {
       Sequence: accountInfo.result.account_data.Sequence,
       LastLedgerSequence: currentLedger + 10,
       SigningPubKey: wallet.publicKey,
-      NetworkID: 21465, // AlphaNet network ID
+      NetworkID: config.network_id
     };
 
     const prepared = tx;

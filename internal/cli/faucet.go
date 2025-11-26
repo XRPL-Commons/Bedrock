@@ -52,6 +52,7 @@ func runFaucet(cmd *cobra.Command, args []string) error {
 		if faucetNetwork == "local" {
 			networkCfg = config.NetworkConfig{
 				URL:       "ws://localhost:6006",
+				NetworkID: 0, // Local network uses network ID 0
 				FaucetURL: "http://localhost:8080/faucet",
 			}
 		} else {
