@@ -50,23 +50,27 @@ func runFaucet(cmd *cobra.Command, args []string) error {
 
 	// Get network configuration
 	networkCfg, ok := cfg.Networks[faucetNetwork]
+	isLocal := faucetNetwork == "local"
 	if !ok {
-		if faucetNetwork == "local" {
+		if isLocal {
 			networkCfg = config.NetworkConfig{
 				URL:       "ws://localhost:6006",
 				NetworkID: 0, // Local network uses network ID 0
-				FaucetURL: "http://localhost:8080/faucet",
 			}
 		} else {
 			return fmt.Errorf("network '%s' not found in config", faucetNetwork)
 		}
 	}
 
-	if networkCfg.FaucetURL == "" {
+	if !isLocal && networkCfg.FaucetURL == "" {
 		return fmt.Errorf("no faucet URL configured for network '%s'", faucetNetwork)
 	}
 
-	fmt.Printf("   Faucet URL: %s\n", networkCfg.FaucetURL)
+	if isLocal {
+		fmt.Printf("   Using genesis account for local funding\n")
+	} else {
+		fmt.Printf("   Faucet URL: %s\n", networkCfg.FaucetURL)
+	}
 
 	// Validate flags
 	if faucetWallet != "" && faucetAddress != "" {
@@ -100,6 +104,7 @@ func runFaucet(cmd *cobra.Command, args []string) error {
 		WalletAddress: faucetAddress,
 		Algorithm:     faucetAlgorithm,
 		NetworkURL:    networkCfg.URL,
+		IsLocal:       isLocal,
 	})
 
 	if err != nil {

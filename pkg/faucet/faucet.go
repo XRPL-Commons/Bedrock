@@ -36,6 +36,7 @@ func (f *Faucet) Request(ctx context.Context, config FaucetConfig) (*FaucetResul
 		"wallet_address": config.WalletAddress,
 		"algorithm":      config.Algorithm,
 		"network_url":    config.NetworkURL,
+		"is_local":       config.IsLocal,
 		"verbose":        f.verbose,
 	}
 

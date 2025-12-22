@@ -16,4 +16,5 @@ type FaucetConfig struct {
 	WalletAddress string
 	Algorithm     string
 	NetworkURL    string
+	IsLocal       bool
 }
