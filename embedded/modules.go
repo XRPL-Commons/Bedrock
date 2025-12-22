@@ -12,7 +12,7 @@ import (
 	"sync"
 )
 
-//go:embed modules/deploy/deploy.js modules/call/call.js modules/faucet/faucet.js modules/package.json
+//go:embed modules/deploy/deploy.js modules/call/call.js modules/faucet/faucet.js modules/jade/jade.js modules/package.json
 var ModulesFS embed.FS
 
 var (
@@ -82,6 +82,13 @@ func getModulesVersion() (string, error) {
 		return "", err
 	}
 	hasher.Write(faucetJS)
+
+	// Hash jade.js
+	jadeJS, err := ModulesFS.ReadFile("modules/jade/jade.js")
+	if err != nil {
+		return "", err
+	}
+	hasher.Write(jadeJS)
 
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
@@ -197,6 +204,19 @@ func SetupModules() (string, error) {
 			faucetPath := filepath.Join(cache, "faucet.js")
 			if err := os.WriteFile(faucetPath, faucetJS, 0755); err != nil {
 				setupError = fmt.Errorf("failed to write faucet.js: %w", err)
+				return
+			}
+
+			// Extract jade.js
+			jadeJS, err := ModulesFS.ReadFile("modules/jade/jade.js")
+			if err != nil {
+				setupError = fmt.Errorf("failed to read jade.js: %w", err)
+				return
+			}
+
+			jadePath := filepath.Join(cache, "jade.js")
+			if err := os.WriteFile(jadePath, jadeJS, 0755); err != nil {
+				setupError = fmt.Errorf("failed to write jade.js: %w", err)
 				return
 			}
 
