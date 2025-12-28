@@ -1,0 +1,160 @@
+# Bedrock - XRPL Smart Contract CLI
+
+> The foundation for XRPL smart contract development
+
+Bedrock is a developer CLI tool for building, deploying, and interacting with XRPL (XRP Ledger) smart contracts written in Rust. Think Foundry, but for XRPL.
+
+## Quick Summary
+
+Bedrock compiles Rust smart contracts to WebAssembly (WASM), deploys them to XRPL networks, and enables interaction with deployed contracts. It handles the complete development lifecycle including local testing with Docker-based nodes.
+
+## Core Commands
+
+### Project Setup
+- `bedrock init <name>` - Create a new smart contract project with boilerplate
+
+### Building
+- `bedrock build` - Compile Rust contract to WASM (release mode, optimized)
+- `bedrock build --debug` - Build in debug mode (faster, larger output)
+
+### Deployment
+- `bedrock deploy` - Deploy contract (auto-builds and generates ABI)
+- `bedrock deploy --network local` - Deploy to local Docker node
+- `bedrock deploy --network alphanet` - Deploy to XRPL alphanet testnet
+- `bedrock deploy --wallet <seed>` - Use specific wallet for deployment
+- `bedrock deploy --skip-build` - Skip automatic rebuild
+- `bedrock deploy --skip-abi` - Skip ABI generation
+
+### Contract Interaction
+- `bedrock call <contract> <function>` - Call a contract function
+- `bedrock call <contract> <function> --params '{"key":"value"}'` - Call with JSON parameters
+- `bedrock call <contract> <function> --params-file params.json` - Parameters from file
+- `bedrock call <contract> <function> --gas 1000000` - Set computation allowance
+- `bedrock call <contract> <function> --wallet <seed>` - Specify wallet (required)
+
+### Local Node Management
+- `bedrock node start` - Start local XRPL node in Docker
+- `bedrock node stop` - Stop the local node
+- `bedrock node status` - Check if node is running
+- `bedrock node logs` - View node logs
+
+### Wallet Management (Jade)
+- `bedrock wallet new <name>` - Create new encrypted wallet
+- `bedrock wallet import <name>` - Import wallet from seed
+- `bedrock wallet list` - List all stored wallets
+- `bedrock wallet export <name>` - Export wallet seed and address
+- `bedrock wallet remove <name>` - Delete a wallet
+
+### Utilities
+- `bedrock clean` - Clean build artifacts and cache
+- `bedrock faucet <address>` - Request testnet funds
+
+## Network Configuration
+
+### Local Node
+- WebSocket: `ws://localhost:6006`
+- Faucet: `http://localhost:8080/faucet`
+
+### Alphanet (Testnet)
+- WebSocket: `wss://alphanet.nerdnest.xyz`
+- Faucet: `https://alphanet.faucet.nerdnest.xyz/accounts`
+- Network ID: 21465
+
+## Project Structure
+
+```
+my-contract/
+├── bedrock.toml          # Project configuration
+├── contract/
+│   ├── Cargo.toml        # Rust dependencies
+│   └── src/
+│       └── lib.rs        # Smart contract code
+└── abi.json              # Generated ABI (after deploy)
+```
+
+## Configuration (bedrock.toml)
+
+```toml
+[project]
+name = "my-contract"
+version = "0.1.0"
+
+[build]
+source = "contract/src/lib.rs"
+target = "wasm32-unknown-unknown"
+
+[networks.local]
+url = "ws://localhost:6006"
+faucet_url = "http://localhost:8080/faucet"
+
+[networks.alphanet]
+url = "wss://alphanet.nerdnest.xyz"
+faucet_url = "https://alphanet.faucet.nerdnest.xyz/accounts"
+```
+
+## Smart Contract Development
+
+### Basic Contract Structure
+
+```rust
+#![cfg_attr(target_arch = "wasm32", no_std)]
+
+use xrpl_wasm::*;
+
+/// @xrpl-function hello
+/// @param name VL - User name
+/// @return UINT64 - Success code
+#[no_mangle]
+pub extern "C" fn hello(name: &[u8]) -> u64 {
+    let _ = trace("Hello from XRPL!");
+    0 // Success
+}
+
+#[cfg(target_arch = "wasm32")]
+#[panic_handler]
+fn panic(_info: &core::panic::PanicInfo) -> ! {
+    loop {}
+}
+```
+
+### ABI Annotations
+
+Functions are documented with JSDoc-style comments:
+- `@xrpl-function <name>` - Mark function for export
+- `@param <name> <TYPE>` - Define parameter with XRPL type
+- `@return <TYPE>` - Define return type
+- `@flag <0|1>` - 0=required (default), 1=optional
+
+### Supported XRPL Types
+
+Integer types: `UINT8`, `UINT16`, `UINT32`, `UINT64`, `UINT128`, `UINT256`
+Specialized: `VL` (bytes/string), `ACCOUNT` (address), `AMOUNT`, `CURRENCY`, `ISSUE`
+
+## Typical Workflow
+
+1. Initialize project: `bedrock init my-contract && cd my-contract`
+2. Edit contract: `contract/src/lib.rs`
+3. Start local node: `bedrock node start`
+4. Deploy: `bedrock deploy --network local`
+5. Call functions: `bedrock call <contract> <function> --wallet <seed>`
+6. Deploy to testnet: `bedrock deploy --network alphanet`
+
+## Transaction Fees
+
+- ContractCreate (deploy): 100 XRP (100000000 drops)
+- ContractCall: 1 XRP (1000000 drops)
+
+## Requirements
+
+- Go 1.21+ (for building Bedrock)
+- Node.js 18+ (for XRPL transaction handling)
+- Rust with wasm32-unknown-unknown target
+- Docker (optional, for local node)
+
+## Documentation
+
+- [Building Contracts](docs/building-contracts.md)
+- [Deployment and Calling](docs/deployment-and-calling.md)
+- [ABI Generation](docs/abi-generation.md)
+- [Local Node](docs/local-node.md)
+- [Wallet Management](docs/wallet.md)

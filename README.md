@@ -372,6 +372,27 @@ Contributions are welcome! Please check out:
 
 MIT License - See [LICENSE](LICENSE) for details
 
+## Documentation
+
+Bedrock includes comprehensive documentation for developers and AI assistants:
+
+### Core Documentation
+| Document | Description |
+|----------|-------------|
+| [Quick Reference](docs/QUICK_REFERENCE.md) | Cheat sheet for common operations |
+| [Commands Reference](docs/COMMANDS_REFERENCE.md) | Complete CLI command documentation |
+| [Building Contracts](docs/building-contracts.md) | Contract compilation guide |
+| [Deployment & Calling](docs/deployment-and-calling.md) | Deploy and interact with contracts |
+| [ABI Generation](docs/abi-generation.md) | ABI annotations and types |
+| [Local Node](docs/local-node.md) | Local development environment |
+| [Wallet Management](docs/wallet.md) | Secure wallet storage |
+
+### For AI Assistants & MCPs
+| Document | Description |
+|----------|-------------|
+| [llms.txt](llms.txt) | Structured overview for LLMs |
+| [CLAUDE.md](CLAUDE.md) | Detailed instructions for AI agents |
+
 ## Resources
 
 - **XRPL Docs**: https://xrpl.org/
