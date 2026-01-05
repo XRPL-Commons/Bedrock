@@ -13,6 +13,7 @@
  *   "wallet_seed": "sXXX..." (optional),
  *   "wallet_address": "rXXX..." (optional),
  *   "network_url": "wss://..." (optional, for balance check),
+ *   "is_local": false (optional, if true uses genesis account for funding),
  *   "verbose": true (optional)
  * }
  *
@@ -34,11 +35,16 @@ const fs = require('fs');
 const https = require('https');
 const http = require('http');
 
+// Genesis account seed for local development
+const GENESIS_SEED = 'snoPBrXtMeMyMHUVTgbuqAfg1SUTb';
+// Default amount to fund in drops (1000 XRP)
+const LOCAL_FAUCET_AMOUNT = '1000000000';
+
 /**
  * Request funds from XRPL faucet
  */
 async function requestFaucet(config) {
-  const { faucet_url, wallet_seed, wallet_address, network_url, verbose } =
+  const { faucet_url, wallet_seed, wallet_address, network_url, is_local, verbose } =
     config;
 
   const log = verbose ? console.error.bind(console) : () => {};
@@ -67,12 +73,20 @@ async function requestFaucet(config) {
       log('  Seed:', wallet.seed);
     }
 
-    log('\nRequesting funds from faucet...');
-    log('  Faucet URL:', faucet_url);
+    let faucetResult;
 
-    // Make faucet request
-    const faucetResult = await makeFaucetRequest(faucet_url, address);
-    log('✓ Faucet request successful');
+    // Use local genesis funding or external faucet
+    if (is_local) {
+      log('\nFunding from local genesis account...');
+      log('  Network URL:', network_url);
+      faucetResult = await fundFromGenesis(network_url, address, log);
+      log('✓ Local funding successful');
+    } else {
+      log('\nRequesting funds from faucet...');
+      log('  Faucet URL:', faucet_url);
+      faucetResult = await makeFaucetRequest(faucet_url, address);
+      log('✓ Faucet request successful');
+    }
 
     // Get balance if network URL provided
     let balance = null;
@@ -108,6 +122,44 @@ async function requestFaucet(config) {
 
     console.log(JSON.stringify(errorResult));
     process.exit(1);
+  }
+}
+
+/**
+ * Fund an address from the local genesis account
+ */
+async function fundFromGenesis(networkUrl, destinationAddress, log) {
+  const client = new xrpl.Client(networkUrl);
+  await client.connect();
+
+  try {
+    // Create genesis wallet
+    const genesisWallet = xrpl.Wallet.fromSeed(GENESIS_SEED);
+    log('  Genesis address:', genesisWallet.address);
+
+    // Prepare Payment transaction
+    const payment = {
+      TransactionType: 'Payment',
+      Account: genesisWallet.address,
+      Destination: destinationAddress,
+      Amount: LOCAL_FAUCET_AMOUNT,
+    };
+
+    // Autofill, sign, and submit
+    const prepared = await client.autofill(payment);
+    const signed = genesisWallet.sign(prepared);
+    const result = await client.submitAndWait(signed.tx_blob);
+
+    if (result.result.meta.TransactionResult !== 'tesSUCCESS') {
+      throw new Error(`Transaction failed: ${result.result.meta.TransactionResult}`);
+    }
+
+    return {
+      txHash: result.result.hash,
+      amount: String(Number(LOCAL_FAUCET_AMOUNT) / 1000000), // Convert drops to XRP
+    };
+  } finally {
+    await client.disconnect();
   }
 }
 
