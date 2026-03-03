@@ -12,11 +12,7 @@ import (
 	"github.com/xrpl-commons/bedrock/pkg/wallet"
 )
 
-var (
-	jadeAlgorithm string
-	jadeNetwork   string
-	jadeWallet    string
-)
+var jadeAlgorithm string
 
 var jadeCmd = &cobra.Command{
 	Use:   "jade",
@@ -94,7 +90,7 @@ The wallet will be encrypted and stored securely on disk.`,
 			os.Exit(1)
 		}
 
-		fmt.Printf("✅ Wallet '%s' created successfully\n", walletName)
+		fmt.Printf("Wallet '%s' created successfully\n", walletName)
 		fmt.Printf("   Address: %s\n", newWallet.Address)
 		fmt.Printf("   Stored at: ~/.config/bedrock/wallets/%s.json\n", walletName)
 	},
@@ -161,7 +157,7 @@ The seed input will be hidden for security.`,
 			os.Exit(1)
 		}
 
-		fmt.Printf("✅ Wallet '%s' imported successfully\n", walletName)
+		fmt.Printf("Wallet '%s' imported successfully\n", walletName)
 		fmt.Printf("   Address: %s\n", importedWallet.Address)
 		fmt.Printf("   Stored at: ~/.config/bedrock/wallets/%s.json\n", walletName)
 	},
@@ -282,7 +278,7 @@ This action cannot be undone. Make sure you have backed up the seed if needed.`,
 			os.Exit(1)
 		}
 
-		fmt.Printf("✅ Wallet '%s' removed successfully\n", walletName)
+		fmt.Printf("Wallet '%s' removed successfully\n", walletName)
 	},
 }
 
@@ -297,22 +293,28 @@ Examples:
   bedrock jade balance rN7n3473SaZBCG4dFL83w7a1RXtXtbk2D8
   bedrock jade balance rN7n3473SaZBCG4dFL83w7a1RXtXtbk2D8 --network local`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		address := args[0]
-		verbose, _ := cmd.Flags().GetBool("verbose")
 
-		networkURL, networkID := getNetworkConfig(jadeNetwork)
-
-		ops, err := jade.NewOperations(verbose)
-		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
+		if err := validateXRPLAddress(address); err != nil {
+			return err
 		}
 
-		result, err := ops.GetBalance(networkURL, networkID, address)
+		network, _ := cmd.Flags().GetString("network")
+		networkURL, err := getNetworkConfig(network)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
+			return err
+		}
+
+		verbose, _ := cmd.Flags().GetBool("verbose")
+		ops, err := jade.NewOperations(verbose)
+		if err != nil {
+			return err
+		}
+
+		result, err := ops.GetBalance(networkURL, address)
+		if err != nil {
+			return err
 		}
 
 		fmt.Printf("Address: %s\n", result.Address)
@@ -321,6 +323,7 @@ Examples:
 		if result.Balance == "0" {
 			fmt.Println("Status:  Not funded")
 		}
+		return nil
 	},
 }
 
@@ -333,39 +336,47 @@ Amount is specified in XRP (not drops).
 
 Examples:
   bedrock jade send rN7n3473SaZBCG4dFL83w7a1RXtXtbk2D8 10 --wallet myWallet
-  bedrock jade send rN7n3473SaZBCG4dFL83w7a1RXtXtbk2D8 100.5 --wallet sXXX...`,
+  bedrock jade send rN7n3473SaZBCG4dFL83w7a1RXtXtbk2D8 100.5 --wallet myWallet --network local`,
 	Args: cobra.ExactArgs(2),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		destination := args[0]
 		amount := args[1]
-		verbose, _ := cmd.Flags().GetBool("verbose")
 
-		if jadeWallet == "" {
-			fmt.Println("Error: --wallet flag is required")
-			os.Exit(1)
+		if err := validateXRPLAddress(destination); err != nil {
+			return fmt.Errorf("invalid destination: %w", err)
 		}
 
-		// Resolve wallet (can be name or seed)
-		walletSeed, err := resolveWalletSeed(jadeWallet)
+		walletFlag, _ := cmd.Flags().GetString("wallet")
+		algorithm, _ := cmd.Flags().GetString("algorithm")
+		network, _ := cmd.Flags().GetString("network")
+
+		// Resolve wallet using the standard WalletResolver
+		resolver, err := wallet.NewWalletResolver()
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("failed to initialize wallet resolver: %w", err)
 		}
 
-		networkURL, networkID := getNetworkConfig(jadeNetwork)
+		walletSeed, err := resolver.ResolveWallet(walletFlag)
+		if err != nil {
+			return fmt.Errorf("failed to resolve wallet: %w", err)
+		}
 
+		networkURL, err := getNetworkConfig(network)
+		if err != nil {
+			return err
+		}
+
+		verbose, _ := cmd.Flags().GetBool("verbose")
 		ops, err := jade.NewOperations(verbose)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		fmt.Printf("Sending %s XRP to %s...\n", amount, destination)
 
-		result, err := ops.Send(networkURL, networkID, walletSeed, destination, amount, jadeAlgorithm)
+		result, err := ops.Send(networkURL, walletSeed, destination, amount, algorithm)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		if result.Result == "tesSUCCESS" {
@@ -379,6 +390,7 @@ Examples:
 		fmt.Printf("Amount:    %s XRP\n", result.Amount)
 		fmt.Printf("Fee:       %s drops\n", result.Fee)
 		fmt.Printf("Validated: %v\n", result.Validated)
+		return nil
 	},
 }
 
@@ -391,22 +403,28 @@ Examples:
   bedrock jade tx 5B5C8D3E2A1F4B6C7D8E9F0A1B2C3D4E5F6A7B8C9D0E1F2A3B4C5D6E7F8A9B0C
   bedrock jade tx 5B5C8D... --network alphanet`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		hash := args[0]
-		verbose, _ := cmd.Flags().GetBool("verbose")
 
-		networkURL, networkID := getNetworkConfig(jadeNetwork)
-
-		ops, err := jade.NewOperations(verbose)
-		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
+		if err := validateTxHash(hash); err != nil {
+			return err
 		}
 
-		result, err := ops.GetTransaction(networkURL, networkID, hash)
+		network, _ := cmd.Flags().GetString("network")
+		networkURL, err := getNetworkConfig(network)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
+			return err
+		}
+
+		verbose, _ := cmd.Flags().GetBool("verbose")
+		ops, err := jade.NewOperations(verbose)
+		if err != nil {
+			return err
+		}
+
+		result, err := ops.GetTransaction(networkURL, hash)
+		if err != nil {
+			return err
 		}
 
 		fmt.Printf("Hash:        %s\n", result.Hash)
@@ -431,6 +449,7 @@ Examples:
 		if result.FunctionName != "" {
 			fmt.Printf("Function:    %s\n", result.FunctionName)
 		}
+		return nil
 	},
 }
 
@@ -443,28 +462,34 @@ Examples:
   bedrock jade account rN7n3473SaZBCG4dFL83w7a1RXtXtbk2D8
   bedrock jade account rN7n3473SaZBCG4dFL83w7a1RXtXtbk2D8 --network local`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		address := args[0]
-		verbose, _ := cmd.Flags().GetBool("verbose")
 
-		networkURL, networkID := getNetworkConfig(jadeNetwork)
-
-		ops, err := jade.NewOperations(verbose)
-		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
+		if err := validateXRPLAddress(address); err != nil {
+			return err
 		}
 
-		result, err := ops.GetAccountInfo(networkURL, networkID, address)
+		network, _ := cmd.Flags().GetString("network")
+		networkURL, err := getNetworkConfig(network)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
+			return err
+		}
+
+		verbose, _ := cmd.Flags().GetBool("verbose")
+		ops, err := jade.NewOperations(verbose)
+		if err != nil {
+			return err
+		}
+
+		result, err := ops.GetAccountInfo(networkURL, address)
+		if err != nil {
+			return err
 		}
 
 		if result.Error != "" {
 			fmt.Printf("Address: %s\n", result.Address)
 			fmt.Printf("Status:  %s\n", result.Error)
-			return
+			return nil
 		}
 
 		fmt.Printf("Address:       %s\n", result.Address)
@@ -477,6 +502,7 @@ Examples:
 		if result.PreviousTxnID != "" {
 			fmt.Printf("Previous TX:   %s\n", result.PreviousTxnID)
 		}
+		return nil
 	},
 }
 
@@ -488,21 +514,22 @@ var jadeServerCmd = &cobra.Command{
 Examples:
   bedrock jade server
   bedrock jade server --network local`,
-	Run: func(cmd *cobra.Command, args []string) {
-		verbose, _ := cmd.Flags().GetBool("verbose")
-
-		networkURL, networkID := getNetworkConfig(jadeNetwork)
-
-		ops, err := jade.NewOperations(verbose)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		network, _ := cmd.Flags().GetString("network")
+		networkURL, err := getNetworkConfig(network)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
-		result, err := ops.GetServerInfo(networkURL, networkID)
+		verbose, _ := cmd.Flags().GetBool("verbose")
+		ops, err := jade.NewOperations(verbose)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
+			return err
+		}
+
+		result, err := ops.GetServerInfo(networkURL)
+		if err != nil {
+			return err
 		}
 
 		fmt.Printf("Build Version:     %s\n", result.BuildVersion)
@@ -516,6 +543,7 @@ Examples:
 				fmt.Printf("Validated Ledger:  %.0f\n", seq)
 			}
 		}
+		return nil
 	},
 }
 
@@ -532,12 +560,13 @@ Examples:
   bedrock jade encode "hello"
   bedrock jade encode "transfer"`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		text := args[0]
 		encoded := hex.EncodeToString([]byte(text))
 		fmt.Printf("Text:    %s\n", text)
 		fmt.Printf("Hex:     %s\n", encoded)
 		fmt.Printf("0x Hex:  0x%s\n", encoded)
+		return nil
 	},
 }
 
@@ -552,7 +581,7 @@ Examples:
   bedrock jade decode 68656c6c6f
   bedrock jade decode 0x68656c6c6f`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		hexStr := args[0]
 
 		// Remove 0x prefix if present
@@ -561,8 +590,7 @@ Examples:
 
 		decoded, err := hex.DecodeString(hexStr)
 		if err != nil {
-			fmt.Printf("Error: Invalid hex string: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("invalid hex string: %w", err)
 		}
 
 		// Check if it's printable text
@@ -581,68 +609,56 @@ Examples:
 			fmt.Printf("Bytes:   %v\n", decoded)
 			fmt.Printf("Text:    %s (may contain non-printable characters)\n", string(decoded))
 		}
+		return nil
 	},
 }
 
-// Helper function to get network configuration
-func getNetworkConfig(network string) (string, uint32) {
-	// Default network URLs
-	networks := map[string]struct {
-		URL string
-		ID  uint32
-	}{
-		"local":    {URL: "ws://localhost:6006", ID: 63456},
-		"alphanet": {URL: "wss://alphanet.nerdnest.xyz", ID: 21465},
-		"testnet":  {URL: "wss://s.altnet.rippletest.net:51233", ID: 1},
-		"mainnet":  {URL: "wss://xrplcluster.com", ID: 0},
+// getNetworkConfig resolves the network name to a URL.
+// It first checks bedrock.toml, then falls back to built-in defaults.
+func getNetworkConfig(network string) (string, error) {
+	networks := map[string]string{
+		"local":    "ws://localhost:6006",
+		"alphanet": "wss://alphanet.nerdnest.xyz",
+		"testnet":  "wss://s.altnet.rippletest.net:51233",
+		"mainnet":  "wss://xrplcluster.com",
 	}
 
 	// Try to load from bedrock.toml first
 	cfg, err := config.LoadFromWorkingDir()
 	if err == nil {
 		if netCfg, ok := cfg.Networks[network]; ok {
-			return netCfg.URL, netCfg.NetworkID
+			return netCfg.URL, nil
 		}
 	}
 
-	// Fall back to defaults
-	if net, ok := networks[network]; ok {
-		return net.URL, net.ID
+	// Fall back to built-in defaults
+	if url, ok := networks[network]; ok {
+		return url, nil
 	}
 
-	// Default to alphanet if unknown
-	return networks["alphanet"].URL, networks["alphanet"].ID
+	return "", fmt.Errorf("unknown network %q, available: local, alphanet, testnet, mainnet", network)
 }
 
-// Helper function to resolve wallet seed from name or direct seed
-func resolveWalletSeed(walletNameOrSeed string) (string, error) {
-	// If it starts with 's', assume it's a seed
-	if len(walletNameOrSeed) > 0 && walletNameOrSeed[0] == 's' {
-		return walletNameOrSeed, nil
+// validateXRPLAddress performs basic validation on an XRPL address.
+func validateXRPLAddress(address string) error {
+	if !strings.HasPrefix(address, "r") {
+		return fmt.Errorf("invalid XRPL address %q: must start with 'r'", address)
 	}
-
-	// Otherwise, try to load from wallet manager
-	walletManager, err := wallet.NewWalletManager()
-	if err != nil {
-		return "", fmt.Errorf("failed to initialize wallet manager: %w", err)
+	if len(address) < 25 || len(address) > 35 {
+		return fmt.Errorf("invalid XRPL address %q: must be 25-35 characters", address)
 	}
+	return nil
+}
 
-	if !walletManager.WalletExists(walletNameOrSeed) {
-		return "", fmt.Errorf("wallet '%s' not found. Use a wallet name or provide a seed directly", walletNameOrSeed)
+// validateTxHash performs basic validation on a transaction hash.
+func validateTxHash(hash string) error {
+	if len(hash) != 64 {
+		return fmt.Errorf("invalid transaction hash: must be 64 hex characters, got %d", len(hash))
 	}
-
-	authProvider := wallet.NewAuthProvider()
-	password, err := authProvider.GetPassword("Enter wallet password: ")
-	if err != nil {
-		return "", fmt.Errorf("failed to read password: %w", err)
+	if _, err := hex.DecodeString(hash); err != nil {
+		return fmt.Errorf("invalid transaction hash: must be hexadecimal")
 	}
-
-	loadedWallet, err := walletManager.LoadWallet(walletNameOrSeed, password)
-	if err != nil {
-		return "", fmt.Errorf("failed to load wallet: %w", err)
-	}
-
-	return loadedWallet.Seed, nil
+	return nil
 }
 
 func init() {
@@ -671,12 +687,13 @@ func init() {
 	// Add common flags to network operation commands
 	networkCmds := []*cobra.Command{jadeBalanceCmd, jadeSendCmd, jadeTxCmd, jadeAccountCmd, jadeServerCmd}
 	for _, cmd := range networkCmds {
-		cmd.Flags().StringVarP(&jadeNetwork, "network", "n", "alphanet", "Network to use (local, alphanet, testnet, mainnet)")
+		cmd.Flags().StringP("network", "n", "alphanet", "Network to use (local, alphanet, testnet, mainnet)")
 	}
 
-	// Add wallet flag to send command
-	jadeSendCmd.Flags().StringVarP(&jadeWallet, "wallet", "w", "", "Wallet name or seed (required)")
-	jadeSendCmd.Flags().StringVarP(&jadeAlgorithm, "algorithm", "a", "secp256k1", "Cryptographic algorithm (secp256k1, ed25519)")
+	// Add wallet and algorithm flags to send command
+	jadeSendCmd.Flags().StringP("wallet", "w", "", "Wallet name (required)")
+	jadeSendCmd.MarkFlagRequired("wallet")
+	jadeSendCmd.Flags().StringP("algorithm", "a", "secp256k1", "Cryptographic algorithm (secp256k1, ed25519)")
 
 	// Add jade to root command
 	rootCmd.AddCommand(jadeCmd)

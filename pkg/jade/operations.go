@@ -3,7 +3,6 @@ package jade
 import (
 	"fmt"
 	"math/big"
-	"strconv"
 	"strings"
 
 	"github.com/Peersyst/xrpl-go/xrpl/queries/account"
@@ -128,37 +127,46 @@ func createRPCClient(networkURL string) (*rpc.Client, error) {
 	return rpc.NewClient(cfg), nil
 }
 
-// dropsToXRP converts drops to XRP string
+// dropsToXRP converts drops to XRP string using integer arithmetic for precision
 func dropsToXRP(drops string) string {
-	dropsInt, err := strconv.ParseInt(drops, 10, 64)
-	if err != nil {
+	dropsBig, ok := new(big.Int).SetString(drops, 10)
+	if !ok {
 		return "0"
 	}
-	xrp := float64(dropsInt) / 1_000_000.0
-	return strconv.FormatFloat(xrp, 'f', -1, 64)
+
+	million := big.NewInt(1_000_000)
+	whole := new(big.Int).Div(dropsBig, million)
+	remainder := new(big.Int).Mod(dropsBig, million)
+
+	if remainder.Sign() == 0 {
+		return whole.String()
+	}
+
+	remainderStr := fmt.Sprintf("%06d", remainder.Int64())
+	remainderStr = strings.TrimRight(remainderStr, "0")
+	return fmt.Sprintf("%s.%s", whole.String(), remainderStr)
 }
 
-// xrpToDrops converts XRP string to drops string
+// xrpToDrops converts XRP string to drops string using big.Float for precision
 func xrpToDrops(xrp string) (string, error) {
-	// Parse the XRP amount
-	xrpFloat, err := strconv.ParseFloat(xrp, 64)
+	xrpBig, _, err := big.ParseFloat(xrp, 10, 128, big.ToNearestEven)
 	if err != nil {
 		return "", fmt.Errorf("invalid XRP amount: %w", err)
 	}
 
-	// Convert to drops (1 XRP = 1,000,000 drops)
-	// Use big.Float for precision
-	xrpBig := big.NewFloat(xrpFloat)
+	if xrpBig.Sign() <= 0 {
+		return "", fmt.Errorf("amount must be positive")
+	}
+
 	multiplier := big.NewFloat(1_000_000)
 	dropsBig := new(big.Float).Mul(xrpBig, multiplier)
 
-	// Convert to integer
-	dropsInt, _ := dropsBig.Int64()
-	return strconv.FormatInt(dropsInt, 10), nil
+	dropsInt, _ := dropsBig.Int(nil)
+	return dropsInt.String(), nil
 }
 
 // GetBalance retrieves the XRP balance for an address
-func (o *Operations) GetBalance(networkURL string, networkID uint32, address string) (*BalanceResult, error) {
+func (o *Operations) GetBalance(networkURL string, address string) (*BalanceResult, error) {
 	client, err := createRPCClient(networkURL)
 	if err != nil {
 		return nil, err
@@ -212,14 +220,14 @@ func (o *Operations) GetBalance(networkURL string, networkID uint32, address str
 }
 
 // Send transfers XRP to a destination address
-func (o *Operations) Send(networkURL string, networkID uint32, walletSeed, destination, amount, algorithm string) (*SendResult, error) {
+func (o *Operations) Send(networkURL string, walletSeed, destination, amount, algorithm string) (*SendResult, error) {
 	client, err := createRPCClient(networkURL)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create wallet from seed
-	w, err := wallet.FromSeed(walletSeed, "")
+	w, err := wallet.FromSeed(walletSeed, algorithm)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create wallet from seed: %w", err)
 	}
@@ -293,7 +301,7 @@ func (o *Operations) Send(networkURL string, networkID uint32, walletSeed, desti
 }
 
 // GetTransaction retrieves transaction details by hash
-func (o *Operations) GetTransaction(networkURL string, networkID uint32, hash string) (*TxResult, error) {
+func (o *Operations) GetTransaction(networkURL string, hash string) (*TxResult, error) {
 	client, err := createRPCClient(networkURL)
 	if err != nil {
 		return nil, err
@@ -407,7 +415,7 @@ func (o *Operations) GetTransaction(networkURL string, networkID uint32, hash st
 }
 
 // GetAccountInfo retrieves detailed account information
-func (o *Operations) GetAccountInfo(networkURL string, networkID uint32, address string) (*AccountInfoResult, error) {
+func (o *Operations) GetAccountInfo(networkURL string, address string) (*AccountInfoResult, error) {
 	client, err := createRPCClient(networkURL)
 	if err != nil {
 		return nil, err
@@ -465,7 +473,7 @@ func (o *Operations) GetAccountInfo(networkURL string, networkID uint32, address
 }
 
 // GetServerInfo retrieves XRPL server information
-func (o *Operations) GetServerInfo(networkURL string, networkID uint32) (*ServerInfoResult, error) {
+func (o *Operations) GetServerInfo(networkURL string) (*ServerInfoResult, error) {
 	client, err := createRPCClient(networkURL)
 	if err != nil {
 		return nil, err
