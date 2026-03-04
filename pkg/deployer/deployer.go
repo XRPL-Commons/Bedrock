@@ -50,6 +50,25 @@ func (d *Deployer) Deploy(ctx context.Context, config DeploymentConfig) (*Deploy
 		jsConfig["fee"] = config.Fee
 	}
 
+	if config.Immutable {
+		jsConfig["immutable"] = true
+	}
+	if config.CodeImmutable {
+		jsConfig["code_immutable"] = true
+	}
+	if config.ABIImmutable {
+		jsConfig["abi_immutable"] = true
+	}
+	if config.Undeletable {
+		jsConfig["undeletable"] = true
+	}
+	if config.ReuseCode != "" {
+		jsConfig["reuse_code"] = config.ReuseCode
+	}
+	if config.Params != "" {
+		jsConfig["params"] = config.Params
+	}
+
 	// Execute deploy.js module
 	result, err := d.executor.ExecuteModule(ctx, "deploy.js", jsConfig)
 	if err != nil {

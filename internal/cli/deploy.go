@@ -15,12 +15,19 @@ import (
 )
 
 var (
-	deployNetwork   string
-	deployWallet    string
-	deployABI       string
-	deploySkipBuild bool
-	deploySkipABI   bool
-	deployAlgorithm string
+	deployNetwork       string
+	deployWallet        string
+	deployABI           string
+	deploySkipBuild     bool
+	deploySkipABI       bool
+	deployAlgorithm     string
+	deployImmutable     bool
+	deployCodeImmutable bool
+	deployABIImmutable  bool
+	deployUndeletable   bool
+	deployReuseCode     string
+	deployParams        string
+	deployFee           string
 )
 
 var deployCmd = &cobra.Command{
@@ -46,6 +53,13 @@ func init() {
 	deployCmd.Flags().BoolVar(&deploySkipBuild, "skip-build", false, "Skip building the contract")
 	deployCmd.Flags().BoolVar(&deploySkipABI, "skip-abi", false, "Skip generating ABI")
 	deployCmd.Flags().StringVar(&deployAlgorithm, "algorithm", "secp256k1", "Cryptographic algorithm (secp256k1, ed25519)")
+	deployCmd.Flags().BoolVar(&deployImmutable, "immutable", false, "Set lsfImmutable flag (no modifications allowed)")
+	deployCmd.Flags().BoolVar(&deployCodeImmutable, "code-immutable", false, "Set lsfCodeImmutable flag (code cannot be changed)")
+	deployCmd.Flags().BoolVar(&deployABIImmutable, "abi-immutable", false, "Set lsfABIImmutable flag (ABI cannot be changed)")
+	deployCmd.Flags().BoolVar(&deployUndeletable, "undeletable", false, "Set lsfUndeletable flag (contract cannot be deleted)")
+	deployCmd.Flags().StringVar(&deployReuseCode, "reuse-code", "", "Reference existing ContractSource by hash")
+	deployCmd.Flags().StringVar(&deployParams, "params", "", "Instance parameter values as JSON")
+	deployCmd.Flags().StringVar(&deployFee, "fee", "", "Transaction fee in drops")
 }
 
 func runDeploy(cmd *cobra.Command, args []string) error {
@@ -200,12 +214,19 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 	// Deploy contract
 	ctx := cmd.Context()
 	result, err := d.Deploy(ctx, deployer.DeploymentConfig{
-		WasmPath:   wasmPath,
-		ABIPath:    abiPath,
-		NetworkURL: networkCfg.URL,
-		WalletSeed: walletSeed,
-		Algorithm:  deployAlgorithm,
-		FaucetURL:  faucetURL,
+		WasmPath:      wasmPath,
+		ABIPath:       abiPath,
+		NetworkURL:    networkCfg.URL,
+		WalletSeed:    walletSeed,
+		Algorithm:     deployAlgorithm,
+		FaucetURL:     faucetURL,
+		Fee:           deployFee,
+		Immutable:     deployImmutable,
+		CodeImmutable: deployCodeImmutable,
+		ABIImmutable:  deployABIImmutable,
+		Undeletable:   deployUndeletable,
+		ReuseCode:     deployReuseCode,
+		Params:        deployParams,
 	})
 
 	if err != nil {

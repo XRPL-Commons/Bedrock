@@ -12,7 +12,7 @@ import (
 	"sync"
 )
 
-//go:embed modules/deploy/deploy.js modules/call/call.js modules/faucet/faucet.js modules/package.json
+//go:embed modules/deploy/deploy.js modules/call/call.js modules/faucet/faucet.js modules/modify/modify.js modules/delete/delete.js modules/user_delete/user_delete.js modules/package.json
 var ModulesFS embed.FS
 
 var (
@@ -82,6 +82,27 @@ func getModulesVersion() (string, error) {
 		return "", err
 	}
 	hasher.Write(faucetJS)
+
+	// Hash modify.js
+	modifyJS, err := ModulesFS.ReadFile("modules/modify/modify.js")
+	if err != nil {
+		return "", err
+	}
+	hasher.Write(modifyJS)
+
+	// Hash delete.js
+	deleteJS, err := ModulesFS.ReadFile("modules/delete/delete.js")
+	if err != nil {
+		return "", err
+	}
+	hasher.Write(deleteJS)
+
+	// Hash user_delete.js
+	userDeleteJS, err := ModulesFS.ReadFile("modules/user_delete/user_delete.js")
+	if err != nil {
+		return "", err
+	}
+	hasher.Write(userDeleteJS)
 
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
@@ -197,6 +218,45 @@ func SetupModules() (string, error) {
 			faucetPath := filepath.Join(cache, "faucet.js")
 			if err := os.WriteFile(faucetPath, faucetJS, 0755); err != nil {
 				setupError = fmt.Errorf("failed to write faucet.js: %w", err)
+				return
+			}
+
+			// Extract modify.js
+			modifyJS, err := ModulesFS.ReadFile("modules/modify/modify.js")
+			if err != nil {
+				setupError = fmt.Errorf("failed to read modify.js: %w", err)
+				return
+			}
+
+			modifyPath := filepath.Join(cache, "modify.js")
+			if err := os.WriteFile(modifyPath, modifyJS, 0755); err != nil {
+				setupError = fmt.Errorf("failed to write modify.js: %w", err)
+				return
+			}
+
+			// Extract delete.js
+			deleteJS, err := ModulesFS.ReadFile("modules/delete/delete.js")
+			if err != nil {
+				setupError = fmt.Errorf("failed to read delete.js: %w", err)
+				return
+			}
+
+			deletePath := filepath.Join(cache, "delete.js")
+			if err := os.WriteFile(deletePath, deleteJS, 0755); err != nil {
+				setupError = fmt.Errorf("failed to write delete.js: %w", err)
+				return
+			}
+
+			// Extract user_delete.js
+			userDeleteJS, err := ModulesFS.ReadFile("modules/user_delete/user_delete.js")
+			if err != nil {
+				setupError = fmt.Errorf("failed to read user_delete.js: %w", err)
+				return
+			}
+
+			userDeletePath := filepath.Join(cache, "user_delete.js")
+			if err := os.WriteFile(userDeletePath, userDeleteJS, 0755); err != nil {
+				setupError = fmt.Errorf("failed to write user_delete.js: %w", err)
 				return
 			}
 

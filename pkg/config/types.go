@@ -11,6 +11,9 @@ type Config struct {
 	Deployments map[string]DeploymentInfo `toml:"deployments"`
 	Wallets     WalletsConfig             `toml:"wallets"`
 	LocalNode   LocalNodeConfig           `toml:"local_node"`
+	Test        TestConfig                `toml:"test"`
+	Snapshot    SnapshotConfig            `toml:"snapshot"`
+	Doc         DocConfig                 `toml:"doc"`
 }
 
 type ProjectConfig struct {
@@ -57,11 +60,53 @@ type LocalNodeConfig struct {
 	LedgerInterval int    `toml:"ledger_interval"`
 }
 
+// TestConfig configures the test runner
+type TestConfig struct {
+	FuzzRuns           int    `toml:"fuzz_runs"`
+	FuzzSeed           int64  `toml:"fuzz_seed"`
+	IntegrationNetwork string `toml:"integration_network"`
+	FixturesDir        string `toml:"fixtures_dir"`
+}
+
+// SnapshotConfig configures gas snapshots
+type SnapshotConfig struct {
+	File string `toml:"file"`
+}
+
+// DocConfig configures documentation generation
+type DocConfig struct {
+	Output string `toml:"output"`
+}
+
 // DefaultLocalNodeConfig returns default local node configuration
 func DefaultLocalNodeConfig() LocalNodeConfig {
 	return LocalNodeConfig{
 		ConfigDir:      ".bedrock/node-config",
 		DockerImage:    "transia/alphanet:latest",
 		LedgerInterval: 1000, // 1 second default
+	}
+}
+
+// DefaultTestConfig returns default test configuration
+func DefaultTestConfig() TestConfig {
+	return TestConfig{
+		FuzzRuns:           256,
+		FuzzSeed:           0,
+		IntegrationNetwork: "local",
+		FixturesDir:        "tests/fixtures",
+	}
+}
+
+// DefaultSnapshotConfig returns default snapshot configuration
+func DefaultSnapshotConfig() SnapshotConfig {
+	return SnapshotConfig{
+		File: ".gas-snapshot",
+	}
+}
+
+// DefaultDocConfig returns default documentation configuration
+func DefaultDocConfig() DocConfig {
+	return DocConfig{
+		Output: "docs/api",
 	}
 }

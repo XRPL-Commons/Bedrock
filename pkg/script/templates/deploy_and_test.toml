@@ -1,0 +1,49 @@
+name = "deploy-and-test"
+description = "Deploy contract, fund wallet, and run basic test calls"
+network = "local"
+
+[variables]
+
+[[steps]]
+name = "Fund wallet"
+action = "fund"
+store = "wallet"
+
+[steps.config]
+algorithm = "secp256k1"
+
+[[steps]]
+name = "Deploy contract"
+action = "deploy"
+store = "deploy"
+
+[steps.config]
+wallet_seed = "${wallet.wallet_seed}"
+wasm_path = "contract/target/wasm32-unknown-unknown/release/*.wasm"
+abi_path = "abi.json"
+
+[[steps]]
+name = "Wait for ledger"
+action = "wait"
+
+[steps.config]
+seconds = 3
+
+[[steps]]
+name = "Call hello function"
+action = "call"
+store = "call_result"
+
+[steps.config]
+contract_account = "${deploy.contract_account}"
+function = "hello"
+wallet_seed = "${wallet.wallet_seed}"
+
+[[steps]]
+name = "Verify success"
+action = "assert"
+
+[[steps.assertions]]
+field = "${call_result.return_code}"
+operator = "eq"
+value = "0"
