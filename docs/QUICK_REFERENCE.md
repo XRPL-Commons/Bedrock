@@ -11,8 +11,8 @@ A quick lookup guide for common Bedrock operations.
 | `bedrock deploy` | Deploy contract |
 | `bedrock call <addr> <fn>` | Call contract function |
 | `bedrock node start/stop` | Manage local node |
-| `bedrock wallet new <name>` | Create wallet |
-| `bedrock faucet <addr>` | Get testnet funds |
+| `bedrock jade new <name>` | Create wallet |
+| `bedrock faucet` | Get testnet funds |
 | `bedrock clean` | Clean build artifacts |
 
 ## Quick Start
@@ -50,14 +50,14 @@ bedrock call <contract> <function> --wallet <seed>
   --network alphanet                # Target network
 ```
 
-## Wallet Commands
+## Wallet Commands (Jade)
 
 ```bash
-bedrock wallet new <name>           # Create encrypted wallet
-bedrock wallet import <name>        # Import from seed
-bedrock wallet list                 # List all wallets
-bedrock wallet export <name>        # Show seed
-bedrock wallet remove <name>        # Delete wallet
+bedrock jade new <name>             # Create encrypted wallet
+bedrock jade import <name>          # Import from seed
+bedrock jade list                   # List all wallets
+bedrock jade export <name>          # Show seed
+bedrock jade remove <name>          # Delete wallet
 ```
 
 ## ABI Annotations
@@ -92,16 +92,19 @@ bedrock wallet remove <name>        # Delete wallet
 
 ```rust
 #![cfg_attr(target_arch = "wasm32", no_std)]
-use xrpl_wasm::*;
+
+#[cfg(not(target_arch = "wasm32"))]
+extern crate std;
+
+use xrpl_wasm_macros::wasm_export;
+use xrpl_wasm_std::host::trace::trace;
 
 /// @xrpl-function my_func
-/// @return UINT64
-#[no_mangle]
-pub extern "C" fn my_func() -> u64 { 0 }
-
-#[cfg(target_arch = "wasm32")]
-#[panic_handler]
-fn panic(_: &core::panic::PanicInfo) -> ! { loop {} }
+#[wasm_export]
+fn my_func() -> i32 {
+    let _ = trace("Hello from XRPL Smart Contract!");
+    0
+}
 ```
 
 ## File Structure

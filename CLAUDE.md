@@ -24,7 +24,7 @@ Creates a project structure with `bedrock.toml`, `contract/` directory, and boil
 bedrock build
 
 # Build in debug mode (faster compilation)
-bedrock build --debug
+bedrock build --release=false
 ```
 
 ### Deploying Contracts
@@ -97,24 +97,24 @@ bedrock node logs
 - WebSocket: `ws://localhost:6006`
 - Faucet: `http://localhost:8080/faucet`
 
-### Wallet Management
+### Wallet Management (Jade)
 
 ```bash
 # Create new wallet
-bedrock wallet new <name>
-bedrock wallet new <name> --algorithm ed25519
+bedrock jade new <name>
+bedrock jade new <name> --algorithm ed25519
 
 # Import existing wallet
-bedrock wallet import <name>
+bedrock jade import <name>
 
 # List wallets
-bedrock wallet list
+bedrock jade list
 
 # Export wallet (shows seed)
-bedrock wallet export <name>
+bedrock jade export <name>
 
 # Remove wallet
-bedrock wallet remove <name>
+bedrock jade remove <name>
 ```
 
 Wallets are encrypted and stored in `~/.config/bedrock/wallets/`.
@@ -122,10 +122,16 @@ Wallets are encrypted and stored in `~/.config/bedrock/wallets/`.
 ### Other Commands
 
 ```bash
-# Request testnet funds
-bedrock faucet <address>
+# Request testnet funds (generates new wallet)
+bedrock faucet
 
-# Clean build artifacts
+# Request funds for a specific address
+bedrock faucet --address <address>
+
+# Request funds using a wallet seed
+bedrock faucet --wallet <seed>
+
+# Clean cached JS modules and dependencies
 bedrock clean
 ```
 
@@ -147,21 +153,17 @@ bedrock clean
 ```rust
 #![cfg_attr(target_arch = "wasm32", no_std)]
 
-use xrpl_wasm::*;
+#[cfg(not(target_arch = "wasm32"))]
+extern crate std;
+
+use xrpl_wasm_macros::wasm_export;
+use xrpl_wasm_std::host::trace::trace;
 
 /// @xrpl-function my_function
-/// @param input VL - Input data
-/// @return UINT64 - Result code
-#[no_mangle]
-pub extern "C" fn my_function(input: &[u8]) -> u64 {
-    // Implementation
+#[wasm_export]
+fn my_function() -> i32 {
+    let _ = trace("Hello from XRPL Smart Contract!");
     0
-}
-
-#[cfg(target_arch = "wasm32")]
-#[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
-    loop {}
 }
 ```
 
@@ -227,17 +229,26 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 [project]
 name = "my-contract"
 version = "0.1.0"
+authors = ["Your Name"]
 
 [build]
 source = "contract/src/lib.rs"
+output = "contract/target/wasm32-unknown-unknown/release"
 target = "wasm32-unknown-unknown"
+
+[local_node]
+config_dir = ".bedrock/node-config"
+docker_image = "transia/alphanet:latest"
+ledger_interval = 1000
 
 [networks.local]
 url = "ws://localhost:6006"
+network_id = 63456
 faucet_url = "http://localhost:8080/faucet"
 
 [networks.alphanet]
 url = "wss://alphanet.nerdnest.xyz"
+network_id = 21465
 faucet_url = "https://alphanet.faucet.nerdnest.xyz/accounts"
 ```
 
@@ -278,6 +289,6 @@ my-contract/
 
 1. Always use release mode for production deployments
 2. Test on local node before deploying to alphanet
-3. Keep wallet seeds secure - use `bedrock wallet` for encrypted storage
+3. Keep wallet seeds secure - use `bedrock jade` for encrypted storage
 4. Include descriptive ABI annotations for all exported functions
 5. Optimize contracts with `opt-level = "z"` and `lto = true` in Cargo.toml

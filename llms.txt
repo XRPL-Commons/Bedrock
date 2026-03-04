@@ -15,7 +15,7 @@ Bedrock compiles Rust smart contracts to WebAssembly (WASM), deploys them to XRP
 
 ### Building
 - `bedrock build` - Compile Rust contract to WASM (release mode, optimized)
-- `bedrock build --debug` - Build in debug mode (faster, larger output)
+- `bedrock build --release=false` - Build in debug mode (faster, larger output)
 
 ### Deployment
 - `bedrock deploy` - Deploy contract (auto-builds and generates ABI)
@@ -39,15 +39,15 @@ Bedrock compiles Rust smart contracts to WebAssembly (WASM), deploys them to XRP
 - `bedrock node logs` - View node logs
 
 ### Wallet Management (Jade)
-- `bedrock wallet new <name>` - Create new encrypted wallet
-- `bedrock wallet import <name>` - Import wallet from seed
-- `bedrock wallet list` - List all stored wallets
-- `bedrock wallet export <name>` - Export wallet seed and address
-- `bedrock wallet remove <name>` - Delete a wallet
+- `bedrock jade new <name>` - Create new encrypted wallet
+- `bedrock jade import <name>` - Import wallet from seed
+- `bedrock jade list` - List all stored wallets
+- `bedrock jade export <name>` - Export wallet seed and address
+- `bedrock jade remove <name>` - Delete a wallet
 
 ### Utilities
-- `bedrock clean` - Clean build artifacts and cache
-- `bedrock faucet <address>` - Request testnet funds
+- `bedrock clean` - Clean cached JS modules and dependencies
+- `bedrock faucet` - Request testnet funds (use `--address` or `--wallet` flags)
 
 ## Network Configuration
 
@@ -78,17 +78,26 @@ my-contract/
 [project]
 name = "my-contract"
 version = "0.1.0"
+authors = ["Your Name"]
 
 [build]
 source = "contract/src/lib.rs"
+output = "contract/target/wasm32-unknown-unknown/release"
 target = "wasm32-unknown-unknown"
+
+[local_node]
+config_dir = ".bedrock/node-config"
+docker_image = "transia/alphanet:latest"
+ledger_interval = 1000
 
 [networks.local]
 url = "ws://localhost:6006"
+network_id = 63456
 faucet_url = "http://localhost:8080/faucet"
 
 [networks.alphanet]
 url = "wss://alphanet.nerdnest.xyz"
+network_id = 21465
 faucet_url = "https://alphanet.faucet.nerdnest.xyz/accounts"
 ```
 
@@ -99,21 +108,17 @@ faucet_url = "https://alphanet.faucet.nerdnest.xyz/accounts"
 ```rust
 #![cfg_attr(target_arch = "wasm32", no_std)]
 
-use xrpl_wasm::*;
+#[cfg(not(target_arch = "wasm32"))]
+extern crate std;
+
+use xrpl_wasm_macros::wasm_export;
+use xrpl_wasm_std::host::trace::trace;
 
 /// @xrpl-function hello
-/// @param name VL - User name
-/// @return UINT64 - Success code
-#[no_mangle]
-pub extern "C" fn hello(name: &[u8]) -> u64 {
-    let _ = trace("Hello from XRPL!");
-    0 // Success
-}
-
-#[cfg(target_arch = "wasm32")]
-#[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
-    loop {}
+#[wasm_export]
+fn hello() -> i32 {
+    let _ = trace("Hello from XRPL Smart Contract!");
+    0
 }
 ```
 

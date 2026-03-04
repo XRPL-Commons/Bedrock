@@ -9,7 +9,7 @@ Complete reference for all Bedrock CLI commands with detailed options and exampl
 - [deploy](#deploy)
 - [call](#call)
 - [node](#node)
-- [wallet](#wallet)
+- [jade (wallet)](#jade)
 - [faucet](#faucet)
 - [clean](#clean)
 
@@ -63,15 +63,16 @@ bedrock build [flags]
 
 ### Flags
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--debug` | `-d` | Build in debug mode (faster build, larger output) |
+| Flag | Short | Description | Default |
+|------|-------|-------------|---------|
+| `--release` | `-r` | Build in release mode (optimized) | `true` |
+| `--watch` | `-w` | Watch for changes and rebuild (coming soon) | `false` |
 
 ### Output
 
 The compiled WASM is placed in:
-- Release: `target/wasm32-unknown-unknown/release/<name>.wasm`
-- Debug: `target/wasm32-unknown-unknown/debug/<name>.wasm`
+- Release: `contract/target/wasm32-unknown-unknown/release/<name>.wasm`
+- Debug: `contract/target/wasm32-unknown-unknown/debug/<name>.wasm`
 
 ### Examples
 
@@ -80,12 +81,12 @@ The compiled WASM is placed in:
 bedrock build
 
 # Debug build (faster compilation)
-bedrock build --debug
+bedrock build --release=false
 ```
 
 ### Notes
 
-- Release builds are smaller and optimized for deployment
+- Release mode is the default and produces smaller, optimized WASM for deployment
 - Debug builds are faster to compile but produce larger WASM files
 - Automatically adds `wasm32-unknown-unknown` target if missing
 
@@ -109,7 +110,8 @@ bedrock deploy [flags]
 | `--wallet` | `-w` | Wallet seed for signing transactions | Auto-generated |
 | `--skip-build` | | Skip automatic contract rebuild | `false` |
 | `--skip-abi` | | Skip ABI generation | `false` |
-| `--algorithm` | `-a` | Wallet algorithm (secp256k1, ed25519) | `secp256k1` |
+| `--abi` | `-a` | Path to ABI file | `abi.json` |
+| `--algorithm` | | Cryptographic algorithm (secp256k1, ed25519) | `secp256k1` |
 
 ### Smart Deployment
 
@@ -178,9 +180,11 @@ bedrock call <contract> <function> [flags]
 | `--wallet` | `-w` | Wallet seed for signing (required) | - |
 | `--network` | `-n` | Target network | `alphanet` |
 | `--params` | `-p` | JSON string of function parameters | - |
-| `--params-file` | | Path to JSON file with parameters | - |
+| `--params-file` | `-f` | Path to JSON file with parameters | - |
 | `--gas` | `-g` | Computation allowance | `1000000` |
-| `--fee` | `-f` | Transaction fee in drops | `1000000` |
+| `--fee` | | Transaction fee in drops | `1000000` |
+| `--abi` | `-a` | Path to ABI file | `abi.json` |
+| `--algorithm` | | Cryptographic algorithm (secp256k1, ed25519) | `secp256k1` |
 
 ### Parameter Passing
 
@@ -242,7 +246,7 @@ bedrock node <command>
 | `start` | Start the local XRPL node |
 | `stop` | Stop the running node |
 | `status` | Check if the node is running |
-| `logs` | View node container logs |
+| `logs` | View node container logs (not yet implemented; use `docker logs bedrock-xrpl-node` for now) |
 
 ### Local Node Endpoints
 
@@ -274,18 +278,18 @@ bedrock node stop
 
 ---
 
-## wallet
+## jade
 
 Manage XRPL wallets with encrypted local storage.
 
 ### Subcommands
 
-### wallet new
+### jade new
 
 Create a new XRPL wallet.
 
 ```bash
-bedrock wallet new <name> [flags]
+bedrock jade new <name> [flags]
 ```
 
 | Flag | Short | Description | Default |
@@ -294,16 +298,16 @@ bedrock wallet new <name> [flags]
 
 **Example:**
 ```bash
-bedrock wallet new my-dev-wallet
-bedrock wallet new my-ed-wallet --algorithm ed25519
+bedrock jade new my-dev-wallet
+bedrock jade new my-ed-wallet --algorithm ed25519
 ```
 
-### wallet import
+### jade import
 
 Import an existing wallet from a seed.
 
 ```bash
-bedrock wallet import <name> [flags]
+bedrock jade import <name> [flags]
 ```
 
 | Flag | Short | Description | Default |
@@ -312,38 +316,38 @@ bedrock wallet import <name> [flags]
 
 **Example:**
 ```bash
-bedrock wallet import my-existing-wallet
+bedrock jade import my-existing-wallet
 # You'll be prompted to enter the seed securely
 ```
 
-### wallet list
+### jade list
 
 List all stored wallets.
 
 ```bash
-bedrock wallet list
+bedrock jade list
 ```
 
-### wallet export
+### jade export
 
 Export a wallet's seed and address.
 
 ```bash
-bedrock wallet export <name>
+bedrock jade export <name>
 ```
 
 **Example:**
 ```bash
-bedrock wallet export my-dev-wallet
+bedrock jade export my-dev-wallet
 # You'll be prompted for the password
 ```
 
-### wallet remove
+### jade remove
 
 Permanently delete a stored wallet.
 
 ```bash
-bedrock wallet remove <name>
+bedrock jade remove <name>
 ```
 
 ### Storage Location
@@ -356,34 +360,39 @@ Wallets are stored encrypted in:
 
 ## faucet
 
-Request testnet funds for an XRPL account.
+Request testnet funds from the XRPL faucet.
 
 ### Usage
 
 ```bash
-bedrock faucet <address> [flags]
+bedrock faucet [flags]
 ```
-
-### Arguments
-
-| Argument | Description |
-|----------|-------------|
-| `address` | XRPL account address to fund (rXXX...) |
 
 ### Flags
 
 | Flag | Short | Description | Default |
 |------|-------|-------------|---------|
 | `--network` | `-n` | Target network | `alphanet` |
+| `--wallet` | `-w` | Wallet seed (optional) | - |
+| `--address` | `-a` | Wallet address (optional) | - |
+| `--algorithm` | | Cryptographic algorithm (secp256k1, ed25519) | `secp256k1` |
+
+If neither `--wallet` nor `--address` is provided, a new wallet is generated automatically.
 
 ### Examples
 
 ```bash
-# Fund an account on alphanet
-bedrock faucet rMyAddress123...
+# Generate new wallet and fund it
+bedrock faucet
+
+# Fund a specific address
+bedrock faucet --address rMyAddress123...
+
+# Fund using an existing wallet seed
+bedrock faucet --wallet sEd7...
 
 # Fund on local network
-bedrock faucet rMyAddress123... --network local
+bedrock faucet --network local
 ```
 
 ### Network Faucets
@@ -407,23 +416,17 @@ bedrock clean [flags]
 
 ### What it removes
 
-- `target/` directory (Rust build artifacts)
-- Local cache files
+- Extracted JavaScript modules (deploy.js, call.js, faucet.js)
+- Installed npm dependencies (node_modules)
+- Version tracking file
 
-### Flags
-
-| Flag | Description |
-|------|-------------|
-| `--all` | Also clean global module cache (~/.cache/bedrock) |
+After cleaning, the next command that requires JS modules will automatically reinstall all dependencies fresh.
 
 ### Examples
 
 ```bash
-# Clean project build artifacts
+# Clean bedrock cache
 bedrock clean
-
-# Clean everything including global cache
-bedrock clean --all
 ```
 
 ---
@@ -437,23 +440,3 @@ These flags are available for all commands:
 | `--help` | Display help for the command |
 | `--version` | Display Bedrock version |
 
----
-
-## Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `BEDROCK_CACHE_DIR` | Override default cache directory |
-| `BEDROCK_CONFIG_DIR` | Override default config directory |
-
----
-
-## Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | General error |
-| 2 | Configuration error |
-| 3 | Network error |
-| 4 | Build error |

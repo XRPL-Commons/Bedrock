@@ -368,10 +368,6 @@ Contributions are welcome! Please check out:
 - [ ] Watch mode for development
 - [ ] Migration to pure Go (when XRPL tooling matures)
 
-## License
-
-MIT License - See [LICENSE](LICENSE) for details
-
 ## Documentation
 
 Bedrock includes comprehensive documentation for developers and AI assistants:
@@ -392,6 +388,10 @@ Bedrock includes comprehensive documentation for developers and AI assistants:
 |----------|-------------|
 | [llms.txt](llms.txt) | Structured overview for LLMs |
 | [CLAUDE.md](CLAUDE.md) | Detailed instructions for AI agents |
+
+## License
+
+MIT License - See [LICENSE](LICENSE) for details
 
 ## Resources
 
