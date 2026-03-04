@@ -1,14 +1,16 @@
 package jade
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"math/big"
+	"net/http"
 	"strings"
 
 	"github.com/Peersyst/xrpl-go/xrpl/queries/account"
 	"github.com/Peersyst/xrpl-go/xrpl/queries/common"
 	"github.com/Peersyst/xrpl-go/xrpl/queries/server"
-	"github.com/Peersyst/xrpl-go/xrpl/queries/transactions"
 	"github.com/Peersyst/xrpl-go/xrpl/rpc"
 	rpctypes "github.com/Peersyst/xrpl-go/xrpl/rpc/types"
 	"github.com/Peersyst/xrpl-go/xrpl/transaction"
@@ -300,115 +302,131 @@ func (o *Operations) Send(networkURL string, walletSeed, destination, amount, al
 	}, nil
 }
 
-// GetTransaction retrieves transaction details by hash
+// GetTransaction retrieves transaction details by hash.
+// Uses raw JSON-RPC instead of xrpl-go's typed parser because xrpl-go
+// does not have parsers for contract-related transaction types
+// (ContractCreate, ContractCall, ContractModify, ContractDelete).
 func (o *Operations) GetTransaction(networkURL string, hash string) (*TxResult, error) {
-	client, err := createRPCClient(networkURL)
-	if err != nil {
-		return nil, err
-	}
-
 	if o.verbose {
 		fmt.Printf("Fetching transaction %s...\n", hash)
 	}
 
-	req := &transactions.TxRequest{
-		Transaction: hash,
-		Binary:      false,
+	// Use raw HTTP JSON-RPC to avoid xrpl-go parser limitations
+	rpcURL := networkURL
+	if strings.HasPrefix(networkURL, "ws://") {
+		rpcURL = strings.Replace(networkURL, "ws://", "http://", 1)
+	} else if strings.HasPrefix(networkURL, "wss://") {
+		rpcURL = strings.Replace(networkURL, "wss://", "https://", 1)
 	}
 
-	resp, err := client.Request(req)
+	reqBody := map[string]interface{}{
+		"method": "tx",
+		"params": []map[string]interface{}{
+			{
+				"transaction": hash,
+				"binary":      false,
+			},
+		},
+	}
+
+	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get transaction: %w", err)
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	var txResp transactions.TxResponse
-	if err := resp.GetResult(&txResp); err != nil {
-		return nil, fmt.Errorf("failed to parse transaction: %w", err)
+	httpResp, err := http.Post(rpcURL, "application/json", bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, fmt.Errorf("failed to send tx request: %w", err)
+	}
+	defer httpResp.Body.Close()
+
+	var rpcResp struct {
+		Result map[string]interface{} `json:"result"`
+	}
+	if err := json.NewDecoder(httpResp.Body).Decode(&rpcResp); err != nil {
+		return nil, fmt.Errorf("failed to decode tx response: %w", err)
 	}
 
-	// Extract transaction type
-	txType := ""
-	if typeVal, ok := txResp.Tx["TransactionType"]; ok {
-		txType = fmt.Sprintf("%v", typeVal)
+	res := rpcResp.Result
+	if errMsg, ok := res["error"].(string); ok {
+		return nil, fmt.Errorf("tx lookup failed: %s", errMsg)
 	}
 
-	// Extract account
-	txAccount := ""
-	if accVal, ok := txResp.Tx["Account"]; ok {
-		txAccount = fmt.Sprintf("%v", accVal)
-	}
-
-	// Extract fee
-	fee := ""
-	if feeVal, ok := txResp.Tx["Fee"]; ok {
-		fee = fmt.Sprintf("%v", feeVal)
-	}
-
-	// Extract sequence
-	sequence := 0
-	if seqVal, ok := txResp.Tx["Sequence"]; ok {
-		switch v := seqVal.(type) {
-		case float64:
-			sequence = int(v)
-		case int:
-			sequence = v
+	getString := func(m map[string]interface{}, key string) string {
+		if v, ok := m[key]; ok {
+			return fmt.Sprintf("%v", v)
 		}
+		return ""
+	}
+
+	getInt := func(m map[string]interface{}, key string) int {
+		if v, ok := m[key].(float64); ok {
+			return int(v)
+		}
+		return 0
+	}
+
+	txType := getString(res, "TransactionType")
+
+	txResult := &TxResult{
+		Hash:      getString(res, "hash"),
+		Type:      txType,
+		Account:   getString(res, "Account"),
+		Fee:       getString(res, "Fee"),
+		Sequence:  getInt(res, "Sequence"),
+		LedgerIndex: getInt(res, "ledger_index"),
+		Date:      getInt(res, "date"),
+	}
+
+	if v, ok := res["validated"].(bool); ok {
+		txResult.Validated = v
 	}
 
 	// Extract result from meta
-	result := "tesSUCCESS"
-	if meta, ok := txResp.Meta.(map[string]interface{}); ok {
-		if txResult, ok := meta["TransactionResult"].(string); ok {
-			result = txResult
+	txResult.Result = "tesSUCCESS"
+	if meta, ok := res["meta"].(map[string]interface{}); ok {
+		if r, ok := meta["TransactionResult"].(string); ok {
+			txResult.Result = r
 		}
 	}
 
-	txResult := &TxResult{
-		Hash:        string(txResp.Hash),
-		Type:        txType,
-		Account:     txAccount,
-		Result:      result,
-		Fee:         fee,
-		Sequence:    sequence,
-		Validated:   txResp.Validated,
-		LedgerIndex: int(txResp.LedgerIndex),
-		Date:        int(txResp.Date),
-	}
-
-	// Add type-specific fields
-	if txType == "Payment" {
-		if destVal, ok := txResp.Tx["Destination"]; ok {
-			txResult.Destination = fmt.Sprintf("%v", destVal)
+	// Type-specific fields
+	switch txType {
+	case "Payment":
+		txResult.Destination = getString(res, "Destination")
+		if amt, ok := res["Amount"]; ok {
+			txResult.Amount = amt
 		}
-		if amtVal, ok := txResp.Tx["Amount"]; ok {
-			txResult.Amount = amtVal
-		}
-		if meta, ok := txResp.Meta.(map[string]interface{}); ok {
+		if meta, ok := res["meta"].(map[string]interface{}); ok {
 			if delivered, ok := meta["delivered_amount"]; ok {
 				txResult.DeliveredAmount = delivered
 			}
 		}
-	} else if txType == "ContractCreate" {
-		if meta, ok := txResp.Meta.(map[string]interface{}); ok {
+
+	case "ContractCreate":
+		if meta, ok := res["meta"].(map[string]interface{}); ok {
 			if contractAcc, ok := meta["ContractAccount"].(string); ok {
 				txResult.ContractAccount = contractAcc
 			}
 		}
-		if wasmHex, ok := txResp.Tx["WasmHex"].(string); ok {
+		if wasmHex, ok := res["ContractCode"].(string); ok {
 			txResult.WasmSize = len(wasmHex) / 2
 		}
-	} else if txType == "ContractCall" {
-		if contractAcc, ok := txResp.Tx["ContractAccount"].(string); ok {
-			txResult.ContractAccount = contractAcc
-		}
-		if funcName, ok := txResp.Tx["FunctionName"].(string); ok {
-			txResult.FunctionName = funcName
-		}
-		if meta, ok := txResp.Meta.(map[string]interface{}); ok {
+
+	case "ContractCall":
+		txResult.ContractAccount = getString(res, "ContractAccount")
+		txResult.FunctionName = getString(res, "FunctionName")
+		if meta, ok := res["meta"].(map[string]interface{}); ok {
 			if returnVal, ok := meta["HookReturnString"].(string); ok {
 				txResult.ReturnValue = returnVal
 			}
 		}
+
+	case "ContractModify":
+		txResult.ContractAccount = getString(res, "ContractAccount")
+
+	case "ContractDelete":
+		txResult.ContractAccount = getString(res, "ContractAccount")
 	}
 
 	return txResult, nil
