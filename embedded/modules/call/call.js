@@ -236,22 +236,12 @@ async function callContract(config) {
       .toString('hex')
       .toUpperCase();
 
-    // Get account sequence and current ledger manually to avoid autofill
-    const [accountInfo, ledgerInfo] = await Promise.all([
-      client.request({
-        command: 'account_info',
-        account: wallet.address,
-      }),
-      client.request({
-        command: 'ledger',
-        ledger_index: 'validated',
-      })
-    ]);
+    // Manual construction: autofill tries to simulate ContractCall which nodes may not support
+    const accountInfo = await client.request({
+      command: 'account_info',
+      account: wallet.address,
+    });
 
-    const currentLedger = ledgerInfo.result.ledger_index;
-    log(`Current ledger: ${currentLedger}`);
-    log(`Target LastLedgerSequence: ${currentLedger + 10}`);
-    
     const tx = {
       TransactionType: 'ContractCall',
       Account: wallet.address,
@@ -261,22 +251,52 @@ async function callContract(config) {
       ComputationAllowance: computation_allowance || '1000000',
       Fee: fee || '1000000',
       Sequence: accountInfo.result.account_data.Sequence,
-      LastLedgerSequence: currentLedger + 10,
       SigningPubKey: wallet.publicKey,
-      NetworkID: config.network_id
+      NetworkID: config.network_id,
     };
 
-    const prepared = tx;
-    const signed = wallet.sign(prepared);
+    const signed = wallet.sign(tx);
 
     log('Transaction ID:', signed.hash);
 
-    const result = await client.submitAndWait(signed.tx_blob);
+    // Submit and wait for validation manually (submitAndWait may timeout on ContractCall)
+    const submitResponse = await client.request({
+      command: 'submit',
+      tx_blob: signed.tx_blob,
+    });
+
+    log('Submit response:', submitResponse.result.engine_result || submitResponse.result.error);
+
+    if (submitResponse.result.engine_result &&
+        submitResponse.result.engine_result !== 'tesSUCCESS' &&
+        !submitResponse.result.engine_result.startsWith('tes')) {
+      throw new Error(`Transaction rejected: ${submitResponse.result.engine_result} - ${submitResponse.result.engine_result_message}`);
+    }
+
+    // Wait for validation by polling tx
+    let txResult = null;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      await new Promise(r => setTimeout(r, 1000));
+      try {
+        const txResponse = await client.request({
+          command: 'tx',
+          transaction: signed.hash,
+        });
+        if (txResponse.result.validated) {
+          txResult = txResponse.result;
+          break;
+        }
+      } catch (e) {
+        // Transaction not yet found, keep waiting
+      }
+    }
+
+    if (!txResult) {
+      throw new Error('Transaction was not validated within 30 seconds');
+    }
 
     log('\n✓ Contract function called successfully!');
 
-    // Extract result information
-    const txResult = result.result;
     const meta = txResult.meta;
 
     log('\nTransaction Status:');
@@ -304,9 +324,9 @@ async function callContract(config) {
     if (meta?.GasUsed !== undefined) {
       log('\nGas/Computation Used:');
       log(`  Gas Used: ${meta.GasUsed}`);
-      log(`  Allowance: ${prepared.ComputationAllowance}`);
+      log(`  Allowance: ${tx.ComputationAllowance}`);
       const percentage = (
-        (meta.GasUsed / parseInt(prepared.ComputationAllowance)) *
+        (meta.GasUsed / parseInt(tx.ComputationAllowance)) *
         100
       ).toFixed(2);
       log(`  Percentage: ${percentage}%`);
