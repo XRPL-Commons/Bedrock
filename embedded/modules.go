@@ -17,7 +17,8 @@ var ModulesFS embed.FS
 
 var (
 	cacheDir   string
-	setupOnce  sync.Once
+	setupMu    sync.Mutex
+	setupDone  bool
 	setupError error
 )
 
@@ -141,159 +142,143 @@ func needsReinstall(cacheDir string) (bool, error) {
 // SetupModules extracts embedded modules to cache and installs dependencies (lazy, once)
 // This is called automatically on first use and cached for subsequent calls
 func SetupModules() (string, error) {
-	setupOnce.Do(func() {
-		// Get cache directory
-		cache, err := getCacheDir()
+	setupMu.Lock()
+	defer setupMu.Unlock()
+
+	if setupDone {
+		return cacheDir, nil
+	}
+
+	// Get cache directory
+	cache, err := getCacheDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get cache directory: %w", err)
+	}
+
+	// Check if reinstall needed
+	reinstall, err := needsReinstall(cache)
+	if err != nil {
+		return "", fmt.Errorf("failed to check reinstall status: %w", err)
+	}
+
+	if reinstall {
+		// Clean up old cache if it exists
+		if err := os.RemoveAll(cache); err != nil && !os.IsNotExist(err) {
+			return "", fmt.Errorf("failed to clean cache directory: %w", err)
+		}
+
+		// Create cache directory
+		if err := os.MkdirAll(cache, 0755); err != nil {
+			return "", fmt.Errorf("failed to create cache directory: %w", err)
+		}
+
+		// Extract package.json
+		packageJSON, err := ModulesFS.ReadFile("modules/package.json")
 		if err != nil {
-			setupError = fmt.Errorf("failed to get cache directory: %w", err)
-			return
+			return "", fmt.Errorf("failed to read package.json: %w", err)
 		}
 
-		// Check if reinstall needed
-		reinstall, err := needsReinstall(cache)
+		packagePath := filepath.Join(cache, "package.json")
+		if err := os.WriteFile(packagePath, packageJSON, 0644); err != nil {
+			return "", fmt.Errorf("failed to write package.json: %w", err)
+		}
+
+		// Extract deploy.js
+		deployJS, err := ModulesFS.ReadFile("modules/deploy/deploy.js")
 		if err != nil {
-			setupError = fmt.Errorf("failed to check reinstall status: %w", err)
-			return
+			return "", fmt.Errorf("failed to read deploy.js: %w", err)
 		}
 
-		if reinstall {
-			// Clean up old cache if it exists
-			if err := os.RemoveAll(cache); err != nil && !os.IsNotExist(err) {
-				setupError = fmt.Errorf("failed to clean cache directory: %w", err)
-				return
-			}
-
-			// Create cache directory
-			if err := os.MkdirAll(cache, 0755); err != nil {
-				setupError = fmt.Errorf("failed to create cache directory: %w", err)
-				return
-			}
-
-			// Extract package.json
-			packageJSON, err := ModulesFS.ReadFile("modules/package.json")
-			if err != nil {
-				setupError = fmt.Errorf("failed to read package.json: %w", err)
-				return
-			}
-
-			packagePath := filepath.Join(cache, "package.json")
-			if err := os.WriteFile(packagePath, packageJSON, 0644); err != nil {
-				setupError = fmt.Errorf("failed to write package.json: %w", err)
-				return
-			}
-
-			// Extract deploy.js
-			deployJS, err := ModulesFS.ReadFile("modules/deploy/deploy.js")
-			if err != nil {
-				setupError = fmt.Errorf("failed to read deploy.js: %w", err)
-				return
-			}
-
-			deployPath := filepath.Join(cache, "deploy.js")
-			if err := os.WriteFile(deployPath, deployJS, 0755); err != nil {
-				setupError = fmt.Errorf("failed to write deploy.js: %w", err)
-				return
-			}
-
-			// Extract call.js
-			callJS, err := ModulesFS.ReadFile("modules/call/call.js")
-			if err != nil {
-				setupError = fmt.Errorf("failed to read call.js: %w", err)
-				return
-			}
-
-			callPath := filepath.Join(cache, "call.js")
-			if err := os.WriteFile(callPath, callJS, 0755); err != nil {
-				setupError = fmt.Errorf("failed to write call.js: %w", err)
-				return
-			}
-
-			// Extract faucet.js
-			faucetJS, err := ModulesFS.ReadFile("modules/faucet/faucet.js")
-			if err != nil {
-				setupError = fmt.Errorf("failed to read faucet.js: %w", err)
-				return
-			}
-
-			faucetPath := filepath.Join(cache, "faucet.js")
-			if err := os.WriteFile(faucetPath, faucetJS, 0755); err != nil {
-				setupError = fmt.Errorf("failed to write faucet.js: %w", err)
-				return
-			}
-
-			// Extract modify.js
-			modifyJS, err := ModulesFS.ReadFile("modules/modify/modify.js")
-			if err != nil {
-				setupError = fmt.Errorf("failed to read modify.js: %w", err)
-				return
-			}
-
-			modifyPath := filepath.Join(cache, "modify.js")
-			if err := os.WriteFile(modifyPath, modifyJS, 0755); err != nil {
-				setupError = fmt.Errorf("failed to write modify.js: %w", err)
-				return
-			}
-
-			// Extract delete.js
-			deleteJS, err := ModulesFS.ReadFile("modules/delete/delete.js")
-			if err != nil {
-				setupError = fmt.Errorf("failed to read delete.js: %w", err)
-				return
-			}
-
-			deletePath := filepath.Join(cache, "delete.js")
-			if err := os.WriteFile(deletePath, deleteJS, 0755); err != nil {
-				setupError = fmt.Errorf("failed to write delete.js: %w", err)
-				return
-			}
-
-			// Extract user_delete.js
-			userDeleteJS, err := ModulesFS.ReadFile("modules/user_delete/user_delete.js")
-			if err != nil {
-				setupError = fmt.Errorf("failed to read user_delete.js: %w", err)
-				return
-			}
-
-			userDeletePath := filepath.Join(cache, "user_delete.js")
-			if err := os.WriteFile(userDeletePath, userDeleteJS, 0755); err != nil {
-				setupError = fmt.Errorf("failed to write user_delete.js: %w", err)
-				return
-			}
-
-			// Install npm dependencies
-			fmt.Println("⚡ First run detected - installing JavaScript dependencies...")
-			fmt.Printf("   Cache location: %s\n", cache)
-
-			cmd := exec.Command("npm", "install", "--silent", "--no-progress")
-			cmd.Dir = cache
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-
-			if err := cmd.Run(); err != nil {
-				setupError = fmt.Errorf("failed to install npm dependencies: %w", err)
-				return
-			}
-
-			fmt.Println("✓ Dependencies installed successfully")
-
-			// Write version file
-			currentVersion, err := getModulesVersion()
-			if err != nil {
-				setupError = fmt.Errorf("failed to get modules version: %w", err)
-				return
-			}
-
-			versionPath := filepath.Join(cache, versionFile)
-			if err := os.WriteFile(versionPath, []byte(currentVersion), 0644); err != nil {
-				setupError = fmt.Errorf("failed to write version file: %w", err)
-				return
-			}
+		deployPath := filepath.Join(cache, "deploy.js")
+		if err := os.WriteFile(deployPath, deployJS, 0755); err != nil {
+			return "", fmt.Errorf("failed to write deploy.js: %w", err)
 		}
 
-		cacheDir = cache
-	})
+		// Extract call.js
+		callJS, err := ModulesFS.ReadFile("modules/call/call.js")
+		if err != nil {
+			return "", fmt.Errorf("failed to read call.js: %w", err)
+		}
 
-	return cacheDir, setupError
+		callPath := filepath.Join(cache, "call.js")
+		if err := os.WriteFile(callPath, callJS, 0755); err != nil {
+			return "", fmt.Errorf("failed to write call.js: %w", err)
+		}
+
+		// Extract faucet.js
+		faucetJS, err := ModulesFS.ReadFile("modules/faucet/faucet.js")
+		if err != nil {
+			return "", fmt.Errorf("failed to read faucet.js: %w", err)
+		}
+
+		faucetPath := filepath.Join(cache, "faucet.js")
+		if err := os.WriteFile(faucetPath, faucetJS, 0755); err != nil {
+			return "", fmt.Errorf("failed to write faucet.js: %w", err)
+		}
+
+		// Extract modify.js
+		modifyJS, err := ModulesFS.ReadFile("modules/modify/modify.js")
+		if err != nil {
+			return "", fmt.Errorf("failed to read modify.js: %w", err)
+		}
+
+		modifyPath := filepath.Join(cache, "modify.js")
+		if err := os.WriteFile(modifyPath, modifyJS, 0755); err != nil {
+			return "", fmt.Errorf("failed to write modify.js: %w", err)
+		}
+
+		// Extract delete.js
+		deleteJS, err := ModulesFS.ReadFile("modules/delete/delete.js")
+		if err != nil {
+			return "", fmt.Errorf("failed to read delete.js: %w", err)
+		}
+
+		deletePath := filepath.Join(cache, "delete.js")
+		if err := os.WriteFile(deletePath, deleteJS, 0755); err != nil {
+			return "", fmt.Errorf("failed to write delete.js: %w", err)
+		}
+
+		// Extract user_delete.js
+		userDeleteJS, err := ModulesFS.ReadFile("modules/user_delete/user_delete.js")
+		if err != nil {
+			return "", fmt.Errorf("failed to read user_delete.js: %w", err)
+		}
+
+		userDeletePath := filepath.Join(cache, "user_delete.js")
+		if err := os.WriteFile(userDeletePath, userDeleteJS, 0755); err != nil {
+			return "", fmt.Errorf("failed to write user_delete.js: %w", err)
+		}
+
+		// Install npm dependencies
+		fmt.Println("⚡ First run detected - installing JavaScript dependencies...")
+		fmt.Printf("   Cache location: %s\n", cache)
+
+		cmd := exec.Command("npm", "install", "--silent", "--no-progress")
+		cmd.Dir = cache
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if err := cmd.Run(); err != nil {
+			return "", fmt.Errorf("failed to install npm dependencies: %w", err)
+		}
+
+		fmt.Println("✓ Dependencies installed successfully")
+
+		// Write version file
+		currentVersion, err := getModulesVersion()
+		if err != nil {
+			return "", fmt.Errorf("failed to get modules version: %w", err)
+		}
+
+		versionPath := filepath.Join(cache, versionFile)
+		if err := os.WriteFile(versionPath, []byte(currentVersion), 0644); err != nil {
+			return "", fmt.Errorf("failed to write version file: %w", err)
+		}
+	}
+
+	cacheDir = cache
+	setupDone = true
+	return cacheDir, nil
 }
 
 // GetModulePath returns the path to an extracted module

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -77,7 +78,7 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		if deployNetwork == "local" {
 			networkCfg = config.NetworkConfig{
 				URL:       "ws://localhost:6006",
-				NetworkID: 0, // Local network uses network ID 0
+				NetworkID: 63456,
 				FaucetURL: "http://localhost:8080/faucet",
 			}
 		} else {
@@ -253,14 +254,23 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("  Wallet Address: %s\n", result.WalletAddress)
-	fmt.Printf("  Wallet Seed: %s\n", result.WalletSeed)
+	fmt.Printf("  Wallet Seed: %s\n", maskSeed(result.WalletSeed))
 
 	fmt.Println()
 	color.Yellow("💡 Tips:\n")
+	color.Yellow("   • Use --verbose to see the full wallet seed\n")
 	color.Yellow("   • Save the wallet seed to interact with the contract later\n")
 	if result.ContractAccount != "" {
-		color.Yellow("   • Call functions with: bedrock call %s <function-name> --wallet %s\n", result.ContractAccount, result.WalletSeed)
+		color.Yellow("   • Call functions with: bedrock call %s <function-name> --wallet <seed>\n", result.ContractAccount)
 	}
 
 	return nil
+}
+
+// maskSeed masks a wallet seed, showing only the first 4 and last 4 characters
+func maskSeed(seed string) string {
+	if len(seed) <= 8 {
+		return "****"
+	}
+	return seed[:4] + strings.Repeat("*", len(seed)-8) + seed[len(seed)-4:]
 }

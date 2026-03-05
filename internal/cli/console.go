@@ -50,7 +50,7 @@ func runConsole(cmd *cobra.Command, args []string) error {
 		if consoleNetwork == "local" {
 			networkCfg = config.NetworkConfig{
 				URL:       "ws://localhost:6006",
-				NetworkID: 0,
+				NetworkID: 63456,
 			}
 		} else {
 			return fmt.Errorf("network '%s' not found in config", consoleNetwork)

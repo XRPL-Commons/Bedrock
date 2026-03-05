@@ -170,7 +170,7 @@ contract/target/
 	}
 
 	// Create README.md
-	readmeContent := fmt.Sprintf("# %s\n\nXRPL Smart Contract project\n\n## Getting Started\n\n### Build the contract\n```bash\nbedrock flint build --release\n```\n\n### Start local node\n```bash\nbedrock basalt start\n```\n\n### Deploy\n```bash\nbedrock slate deploy --network local\n```\n\n## Project Structure\n\n- `contract/` - Smart contract source code\n- `bedrock.toml` - Project configuration\n- `.wallets/` - Local wallet storage (git-ignored)\n", projectName)
+	readmeContent := fmt.Sprintf("# %s\n\nXRPL Smart Contract project\n\n## Getting Started\n\n### Build the contract\n```bash\nbedrock build --release\n```\n\n### Start local node\n```bash\nbedrock node start\n```\n\n### Deploy\n```bash\nbedrock deploy --network local\n```\n\n## Project Structure\n\n- `contract/` - Smart contract source code\n- `bedrock.toml` - Project configuration\n- `.wallets/` - Local wallet storage (git-ignored)\n", projectName)
 
 	if err := os.WriteFile(filepath.Join(projectName, "README.md"), []byte(readmeContent), 0644); err != nil {
 		return fmt.Errorf("failed to create README.md: %w", err)
@@ -180,9 +180,9 @@ contract/target/
 	color.Green("\n✓ Project initialized successfully!\n\n")
 	fmt.Println("Next steps:")
 	fmt.Printf("  cd %s\n", projectName)
-	fmt.Println("  bedrock flint build      # Build your contract")
-	fmt.Println("  bedrock basalt start     # Start local node")
-	fmt.Println("  bedrock slate deploy     # Deploy your contract")
+	fmt.Println("  bedrock build --release  # Build your contract")
+	fmt.Println("  bedrock node start       # Start local node")
+	fmt.Println("  bedrock deploy --network local  # Deploy your contract")
 
 	return nil
 }

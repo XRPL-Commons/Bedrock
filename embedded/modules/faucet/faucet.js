@@ -134,7 +134,7 @@ async function fundFromGenesis(networkUrl, destinationAddress, log) {
 
   try {
     // Create genesis wallet
-    const genesisWallet = xrpl.Wallet.fromSeed(GENESIS_SEED);
+    const genesisWallet = xrpl.Wallet.fromSeed(GENESIS_SEED, { algorithm: xrpl.ECDSA.secp256k1 });
     log('  Genesis address:', genesisWallet.address);
 
     // Prepare Payment transaction

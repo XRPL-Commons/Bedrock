@@ -57,7 +57,7 @@ func (f *Fuzzer) Run(ctx context.Context, contractAccount string, walletSeed str
 		if networkName == "local" {
 			networkCfg = config.NetworkConfig{
 				URL:       "ws://localhost:6006",
-				NetworkID: 0,
+				NetworkID: 63456,
 			}
 		} else {
 			return nil, fmt.Errorf("network '%s' not found", networkName)
@@ -77,14 +77,14 @@ func (f *Fuzzer) Run(ctx context.Context, contractAccount string, walletSeed str
 			continue
 		}
 
-		result := f.fuzzFunction(ctx, fn, contractAccount, walletSeed, networkCfg, gen, opts)
+		result := f.fuzzFunction(ctx, fn, contractAccount, walletSeed, networkCfg, gen, opts, abiPath)
 		results = append(results, result)
 	}
 
 	return results, nil
 }
 
-func (f *Fuzzer) fuzzFunction(ctx context.Context, fn abi.Function, contractAccount string, walletSeed string, networkCfg config.NetworkConfig, gen *ValueGenerator, opts TestOptions) FuzzResult {
+func (f *Fuzzer) fuzzFunction(ctx context.Context, fn abi.Function, contractAccount string, walletSeed string, networkCfg config.NetworkConfig, gen *ValueGenerator, opts TestOptions, abiPath string) FuzzResult {
 	startTime := time.Now()
 	result := FuzzResult{
 		Function: fn.Name,
@@ -126,7 +126,7 @@ func (f *Fuzzer) fuzzFunction(ctx context.Context, fn abi.Function, contractAcco
 			NetworkID:            networkCfg.NetworkID,
 			WalletSeed:           walletSeed,
 			Algorithm:            "secp256k1",
-			ABIPath:              "abi.json",
+			ABIPath:              abiPath,
 			Parameters:           params,
 			ComputationAllowance: "1000000",
 			Fee:                  "1000000",

@@ -77,6 +77,14 @@ func (c *Client) Call(ctx context.Context, method string, params ...interface{})
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
+	if resp.StatusCode != http.StatusOK {
+		snippet := string(respBody)
+		if len(snippet) > 200 {
+			snippet = snippet[:200]
+		}
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, snippet)
+	}
+
 	var rpcResp RPCResponse
 	if err := json.Unmarshal(respBody, &rpcResp); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
@@ -102,13 +110,13 @@ func (c *Client) CallTyped(ctx context.Context, target interface{}, method strin
 }
 
 // toHTTPURL converts a WebSocket URL to an HTTP URL for JSON-RPC
-func toHTTPURL(url string) string {
-	if strings.HasPrefix(url, "ws://") {
-		// ws://localhost:6006 -> http://localhost:5005
-		url = strings.Replace(url, "ws://", "http://", 1)
-		url = strings.Replace(url, ":6006", ":5005", 1)
-	} else if strings.HasPrefix(url, "wss://") {
-		url = strings.Replace(url, "wss://", "https://", 1)
+func toHTTPURL(rawURL string) string {
+	if strings.HasPrefix(rawURL, "ws://") {
+		rawURL = strings.Replace(rawURL, "ws://", "http://", 1)
+		// Local dev: WS port 6006 maps to JSON-RPC port 5005
+		rawURL = strings.Replace(rawURL, "localhost:6006", "localhost:5005", 1)
+	} else if strings.HasPrefix(rawURL, "wss://") {
+		rawURL = strings.Replace(rawURL, "wss://", "https://", 1)
 	}
-	return url
+	return rawURL
 }

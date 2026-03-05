@@ -40,6 +40,13 @@ func NewInvariantRunner(cfg *config.Config, verbose bool) *InvariantRunner {
 
 // Run executes random sequences of contract calls and checks invariants
 func (r *InvariantRunner) Run(ctx context.Context, contractAccount string, walletSeed string, invariants []Invariant, functions []abi.Function, opts TestOptions) ([]InvariantResult, error) {
+	abiPath := "abi.json"
+	if contracts := r.cfg.Contracts; contracts != nil {
+		if main, ok := contracts["main"]; ok {
+			abiPath = main.ABI
+		}
+	}
+
 	networkName := r.cfg.Test.IntegrationNetwork
 	if networkName == "" {
 		networkName = "local"
@@ -50,7 +57,7 @@ func (r *InvariantRunner) Run(ctx context.Context, contractAccount string, walle
 		if networkName == "local" {
 			networkCfg = config.NetworkConfig{
 				URL:       "ws://localhost:6006",
-				NetworkID: 0,
+				NetworkID: 63456,
 			}
 		} else {
 			return nil, fmt.Errorf("network '%s' not found", networkName)
@@ -76,14 +83,14 @@ func (r *InvariantRunner) Run(ctx context.Context, contractAccount string, walle
 	var results []InvariantResult
 
 	for _, inv := range invariants {
-		result := r.checkInvariant(ctx, inv, contractAccount, walletSeed, networkCfg, functions, gen, c, runs)
+		result := r.checkInvariant(ctx, inv, contractAccount, walletSeed, networkCfg, functions, gen, c, runs, abiPath)
 		results = append(results, result)
 	}
 
 	return results, nil
 }
 
-func (r *InvariantRunner) checkInvariant(ctx context.Context, inv Invariant, contractAccount string, walletSeed string, networkCfg config.NetworkConfig, functions []abi.Function, gen *ValueGenerator, c *caller.Caller, runs int) InvariantResult {
+func (r *InvariantRunner) checkInvariant(ctx context.Context, inv Invariant, contractAccount string, walletSeed string, networkCfg config.NetworkConfig, functions []abi.Function, gen *ValueGenerator, c *caller.Caller, runs int, abiPath string) InvariantResult {
 	startTime := time.Now()
 	result := InvariantResult{
 		Name: inv.Name,
@@ -116,7 +123,7 @@ func (r *InvariantRunner) checkInvariant(ctx context.Context, inv Invariant, con
 			NetworkID:            networkCfg.NetworkID,
 			WalletSeed:           walletSeed,
 			Algorithm:            "secp256k1",
-			ABIPath:              "abi.json",
+			ABIPath:              abiPath,
 			Parameters:           params,
 			ComputationAllowance: "1000000",
 			Fee:                  "1000000",
@@ -135,7 +142,7 @@ func (r *InvariantRunner) checkInvariant(ctx context.Context, inv Invariant, con
 				NetworkID:            networkCfg.NetworkID,
 				WalletSeed:           walletSeed,
 				Algorithm:            "secp256k1",
-				ABIPath:              "abi.json",
+				ABIPath:              abiPath,
 				ComputationAllowance: "1000000",
 				Fee:                  "1000000",
 			})

@@ -230,12 +230,76 @@ async function deployContract(config) {
       }));
     }
 
-    // Check balance
-    const balance = await client.getXrpBalance(wallet.address);
+    // Check balance and auto-fund if needed
+    let balance = 0;
+    try {
+      balance = await client.getXrpBalance(wallet.address);
+    } catch (e) {
+      // Account not found -- needs funding
+      balance = 0;
+    }
     log(`\nWallet balance: ${balance} XRP`);
 
-    if (parseFloat(balance) === 0) {
-      log('Warning: Wallet not funded, deployment will likely fail');
+    if (parseFloat(balance) === 0 && faucet_url) {
+      log('Wallet not funded, requesting funds...');
+      const isLocal = network_url.includes('localhost') || network_url.includes('127.0.0.1');
+      if (isLocal) {
+        const GENESIS_SEED = 'snoPBrXtMeMyMHUVTgbuqAfg1SUTb';
+        const genesisWallet = xrpl.Wallet.fromSeed(GENESIS_SEED, { algorithm: xrpl.ECDSA.secp256k1 });
+        const payment = {
+          TransactionType: 'Payment',
+          Account: genesisWallet.address,
+          Destination: wallet.address,
+          Amount: '1000000000',
+        };
+        const prepared = await client.autofill(payment);
+        const signed = genesisWallet.sign(prepared);
+        const fundResult = await client.submitAndWait(signed.tx_blob);
+        if (fundResult.result.meta.TransactionResult !== 'tesSUCCESS') {
+          throw new Error(`Funding failed: ${fundResult.result.meta.TransactionResult}`);
+        }
+        log('Funded from local genesis account');
+      } else {
+        // Use external faucet
+        const https = require('https');
+        const http = require('http');
+        await new Promise((resolve, reject) => {
+          const url = new URL(faucet_url);
+          const protocol = url.protocol === 'https:' ? https : http;
+          const postData = JSON.stringify({ destination: wallet.address });
+          const options = {
+            hostname: url.hostname,
+            port: url.port,
+            path: url.pathname + url.search,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(postData),
+            },
+          };
+          const req = protocol.request(options, (res) => {
+            let data = '';
+            res.on('data', (chunk) => { data += chunk; });
+            res.on('end', () => {
+              if (res.statusCode === 200 || res.statusCode === 201) {
+                resolve(data);
+              } else {
+                reject(new Error(`Faucet request failed: ${res.statusCode} ${data}`));
+              }
+            });
+          });
+          req.on('error', (err) => reject(err));
+          req.write(postData);
+          req.end();
+        });
+        log('Funded from external faucet');
+      }
+      // Wait a moment for ledger to close
+      await new Promise(r => setTimeout(r, 2000));
+      balance = await client.getXrpBalance(wallet.address);
+      log(`Updated balance: ${balance} XRP`);
+    } else if (parseFloat(balance) === 0) {
+      log('Warning: Wallet not funded and no faucet URL provided, deployment will likely fail');
     }
 
     // Create ContractCreate transaction
