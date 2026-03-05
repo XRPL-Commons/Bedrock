@@ -94,6 +94,18 @@ func (c *Client) Call(ctx context.Context, method string, params ...interface{})
 		return nil, fmt.Errorf("RPC error %d: %s", rpcResp.Error.Code, rpcResp.Error.Message)
 	}
 
+	// Check for XRPL-style errors inside the result object
+	var resultStatus struct {
+		Status       string `json:"status"`
+		Error        string `json:"error"`
+		ErrorMessage string `json:"error_message"`
+	}
+	if err := json.Unmarshal(rpcResp.Result, &resultStatus); err == nil {
+		if resultStatus.Status == "error" {
+			return nil, fmt.Errorf("RPC error: %s: %s", resultStatus.Error, resultStatus.ErrorMessage)
+		}
+	}
+
 	return rpcResp.Result, nil
 }
 

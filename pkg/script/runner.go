@@ -3,6 +3,7 @@ package script
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -120,6 +121,13 @@ func (r *Runner) executeDeploy(ctx context.Context, step Step, networkName strin
 	}
 
 	wasmPath := r.resolveVar(getStringConfig(step.Config, "wasm_path", ""))
+	// Resolve glob patterns in wasm_path (e.g., "contract/target/.../release/*.wasm")
+	if strings.ContainsAny(wasmPath, "*?[") {
+		matches, err := filepath.Glob(wasmPath)
+		if err == nil && len(matches) > 0 {
+			wasmPath = matches[0]
+		}
+	}
 	abiPath := r.resolveVar(getStringConfig(step.Config, "abi_path", "abi.json"))
 	walletSeed := r.resolveVar(getStringConfig(step.Config, "wallet_seed", ""))
 

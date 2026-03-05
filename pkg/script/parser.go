@@ -1,6 +1,7 @@
 package script
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -8,6 +9,9 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 )
+
+//go:embed templates/deploy_and_test.toml
+var deployAndTestTemplate string
 
 // Script represents a multi-step deployment/interaction script
 type Script struct {
@@ -55,6 +59,28 @@ func ParseScript(path string) (*Script, error) {
 		}
 	default:
 		return nil, fmt.Errorf("unsupported script format: %s (use .toml or .json)", ext)
+	}
+
+	if err := validateScript(&script); err != nil {
+		return nil, err
+	}
+
+	return &script, nil
+}
+
+// LoadTemplate returns a parsed script from a built-in template name
+func LoadTemplate(name string) (*Script, error) {
+	var data string
+	switch name {
+	case "deploy-and-test":
+		data = deployAndTestTemplate
+	default:
+		return nil, fmt.Errorf("unknown template '%s' (available: deploy-and-test)", name)
+	}
+
+	var script Script
+	if err := toml.Unmarshal([]byte(data), &script); err != nil {
+		return nil, fmt.Errorf("failed to parse template: %w", err)
 	}
 
 	if err := validateScript(&script); err != nil {

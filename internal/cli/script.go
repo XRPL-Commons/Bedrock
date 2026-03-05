@@ -43,23 +43,30 @@ func runScript(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load config: %w (run 'bedrock init' first)", err)
 	}
 
-	var scriptPath string
+	var s *script.Script
+	var scriptLabel string
+
 	if scriptTemplate != "" {
-		color.Yellow("Built-in templates are embedded -- use 'bedrock init --template' for project scaffolding\n")
-		return fmt.Errorf("template '%s' not found as a local file", scriptTemplate)
+		var err error
+		s, err = script.LoadTemplate(scriptTemplate)
+		if err != nil {
+			color.Red("Failed to load template: %v\n", err)
+			return err
+		}
+		scriptLabel = fmt.Sprintf("template:%s", scriptTemplate)
 	} else if len(args) > 0 {
-		scriptPath = args[0]
+		var err error
+		s, err = script.ParseScript(args[0])
+		if err != nil {
+			color.Red("Failed to parse script: %v\n", err)
+			return err
+		}
+		scriptLabel = args[0]
 	} else {
 		return fmt.Errorf("provide a script file or use --template")
 	}
 
-	color.Cyan("Running script: %s\n\n", scriptPath)
-
-	s, err := script.ParseScript(scriptPath)
-	if err != nil {
-		color.Red("Failed to parse script: %v\n", err)
-		return err
-	}
+	color.Cyan("Running script: %s\n\n", scriptLabel)
 
 	fmt.Printf("  Name: %s\n", s.Name)
 	fmt.Printf("  Steps: %d\n", len(s.Steps))
