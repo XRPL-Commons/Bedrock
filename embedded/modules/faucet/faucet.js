@@ -93,6 +93,7 @@ async function requestFaucet(config) {
     if (network_url) {
       log('\nChecking balance...');
       const client = new xrpl.Client(network_url);
+      client.apiVersion = 1;
       await client.connect();
       balance = await client.getXrpBalance(address);
       await client.disconnect();
@@ -130,11 +131,12 @@ async function requestFaucet(config) {
  */
 async function fundFromGenesis(networkUrl, destinationAddress, log) {
   const client = new xrpl.Client(networkUrl);
+  client.apiVersion = 1;
   await client.connect();
 
   try {
     // Create genesis wallet
-    const genesisWallet = xrpl.Wallet.fromSeed(GENESIS_SEED);
+    const genesisWallet = xrpl.Wallet.fromSeed(GENESIS_SEED, { algorithm: xrpl.ECDSA.secp256k1 });
     log('  Genesis address:', genesisWallet.address);
 
     // Prepare Payment transaction

@@ -36,6 +36,8 @@
 const xrpl = require('@transia/xrpl');
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
+const https = require('https');
 
 /**
  * Extract exported function names from WASM binary
@@ -119,7 +121,8 @@ function buildFunctionsFromABI(abi, exportedFunctions) {
       continue;
     }
 
-    // Build Parameters array from ABI
+    // Build Parameters array from ABI.
+    // XRPL STArray elements must be wrapped: { Parameter: { ... } }
     const parameters = fn.parameters.map((param) => ({
       Parameter: {
         ParameterName: Buffer.from(param.name).toString('hex').toUpperCase(),
@@ -152,6 +155,13 @@ async function deployContract(config) {
     faucet_url,
     fee,
     verbose,
+    immutable,
+    code_immutable,
+    abi_immutable,
+    undeletable,
+    reuse_code,
+    params,
+    owner,
   } = config;
 
   const log = verbose ? console.error.bind(console) : () => {};
@@ -159,6 +169,7 @@ async function deployContract(config) {
   log('Deploying contract to XRPL...\n');
 
   const client = new xrpl.Client(network_url);
+  client.apiVersion = 1;
 
   try {
     await client.connect();
@@ -174,92 +185,281 @@ async function deployContract(config) {
     log('  Address:', wallet.address);
     log('  Seed:', wallet.seed);
 
-    // Read WASM file
-    if (!fs.existsSync(wasm_path)) {
-      throw new Error(`WASM file not found: ${wasm_path}`);
+    // Read WASM file (unless reusing existing code by hash)
+    let wasmHex;
+    let Functions;
+
+    if (reuse_code) {
+      log(`\nReusing existing ContractSource by hash: ${reuse_code}`);
+    } else {
+      if (!fs.existsSync(wasm_path)) {
+        throw new Error(`WASM file not found: ${wasm_path}`);
+      }
+
+      const wasmBytes = fs.readFileSync(wasm_path);
+      wasmHex = wasmBytes.toString('hex').toUpperCase();
+
+      log(`\nContract size: ${wasmBytes.length} bytes`);
+
+      // Extract functions from WASM
+      const exportedFunctions = extractWasmFunctions(wasmBytes);
+      log(`Found ${exportedFunctions.length} exported function(s):`);
+      exportedFunctions.forEach((name, idx) => {
+        log(`  ${idx + 1}. ${name}`);
+      });
+
+      // Load and validate ABI
+      if (abi_path && fs.existsSync(abi_path)) {
+        log(`\nLoading ABI from: ${abi_path}`);
+        const abiContent = fs.readFileSync(abi_path, 'utf8');
+        const abi = JSON.parse(abiContent);
+
+        log(`ABI contract: ${abi.contract_name}`);
+        log(`ABI functions: ${abi.functions.length}`);
+
+        // Build Functions array with parameter definitions from ABI
+        Functions = buildFunctionsFromABI(abi, exportedFunctions);
+
+        log('\nFunction definitions:');
+        Functions.forEach((f, idx) => {
+          const fn = f.Function;
+          const funcName = Buffer.from(fn.FunctionName, 'hex').toString('utf8');
+          log(`  ${idx + 1}. ${funcName}`);
+          if (fn.Parameters) {
+            fn.Parameters.forEach((p) => {
+              const param = p.Parameter;
+              const paramName = Buffer.from(param.ParameterName, 'hex').toString('utf8');
+              log(`      - ${paramName}: ${param.ParameterType.type}`);
+            });
+          }
+        });
+      } else {
+        // Fallback: no ABI, just function names
+        log('\nNo ABI provided, deploying with function names only');
+        Functions = exportedFunctions.map((name) => ({
+          Function: {
+            FunctionName: Buffer.from(name).toString('hex').toUpperCase(),
+          },
+        }));
+      }
     }
 
-    const wasmBytes = fs.readFileSync(wasm_path);
-    const wasmHex = wasmBytes.toString('hex').toUpperCase();
-
-    log(`\nContract size: ${wasmBytes.length} bytes`);
-
-    // Extract functions from WASM
-    const exportedFunctions = extractWasmFunctions(wasmBytes);
-    log(`Found ${exportedFunctions.length} exported function(s):`);
-    exportedFunctions.forEach((name, idx) => {
-      log(`  ${idx + 1}. ${name}`);
-    });
-
-    // Load and validate ABI
-    let Functions;
-    if (abi_path && fs.existsSync(abi_path)) {
+    // Load ABI separately when reusing code (no WASM to extract functions from)
+    if (reuse_code && abi_path && fs.existsSync(abi_path)) {
       log(`\nLoading ABI from: ${abi_path}`);
       const abiContent = fs.readFileSync(abi_path, 'utf8');
       const abi = JSON.parse(abiContent);
-
-      log(`ABI contract: ${abi.contract_name}`);
-      log(`ABI functions: ${abi.functions.length}`);
-
-      // Build Functions array with parameter definitions from ABI
-      Functions = buildFunctionsFromABI(abi, exportedFunctions);
-
-      log('\nFunction definitions:');
-      Functions.forEach((f, idx) => {
-        const funcName = Buffer.from(f.Function.FunctionName, 'hex').toString(
-          'utf8'
-        );
-        log(`  ${idx + 1}. ${funcName}`);
-        if (f.Function.Parameters) {
-          f.Function.Parameters.forEach((p) => {
-            const paramName = Buffer.from(
-              p.Parameter.ParameterName,
-              'hex'
-            ).toString('utf8');
-            log(`      - ${paramName}: ${p.Parameter.ParameterType.type}`);
-          });
-        }
-      });
-    } else {
-      // Fallback: no ABI, just function names
-      log('\nNo ABI provided, deploying with function names only');
-      Functions = exportedFunctions.map((name) => ({
-        Function: {
-          FunctionName: Buffer.from(name).toString('hex').toUpperCase(),
-        },
-      }));
+      const functionNames = abi.functions.map(f => f.name);
+      Functions = buildFunctionsFromABI(abi, functionNames);
     }
 
-    // Check balance
-    const balance = await client.getXrpBalance(wallet.address);
+    // Check balance and auto-fund if needed
+    let balance = 0;
+    try {
+      balance = await client.getXrpBalance(wallet.address);
+    } catch (e) {
+      // Account not found -- needs funding
+      balance = 0;
+    }
     log(`\nWallet balance: ${balance} XRP`);
 
-    if (parseFloat(balance) === 0) {
-      log('Warning: Wallet not funded, deployment will likely fail');
+    if (parseFloat(balance) === 0 && faucet_url) {
+      log('Wallet not funded, requesting funds...');
+      const isLocal = network_url.includes('localhost') || network_url.includes('127.0.0.1');
+      if (isLocal) {
+        const GENESIS_SEED = 'snoPBrXtMeMyMHUVTgbuqAfg1SUTb';
+        const genesisWallet = xrpl.Wallet.fromSeed(GENESIS_SEED, { algorithm: xrpl.ECDSA.secp256k1 });
+        const payment = {
+          TransactionType: 'Payment',
+          Account: genesisWallet.address,
+          Destination: wallet.address,
+          Amount: '1000000000',
+        };
+        const prepared = await client.autofill(payment);
+        const signed = genesisWallet.sign(prepared);
+        const fundResult = await client.submitAndWait(signed.tx_blob);
+        if (fundResult.result.meta.TransactionResult !== 'tesSUCCESS') {
+          throw new Error(`Funding failed: ${fundResult.result.meta.TransactionResult}`);
+        }
+        log('Funded from local genesis account');
+      } else {
+        // Use external faucet
+        const https = require('https');
+        const http = require('http');
+        await new Promise((resolve, reject) => {
+          const url = new URL(faucet_url);
+          const protocol = url.protocol === 'https:' ? https : http;
+          const postData = JSON.stringify({ destination: wallet.address });
+          const options = {
+            hostname: url.hostname,
+            port: url.port,
+            path: url.pathname + url.search,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(postData),
+            },
+          };
+          const req = protocol.request(options, (res) => {
+            let data = '';
+            res.on('data', (chunk) => { data += chunk; });
+            res.on('end', () => {
+              if (res.statusCode === 200 || res.statusCode === 201) {
+                resolve(data);
+              } else {
+                reject(new Error(`Faucet request failed: ${res.statusCode} ${data}`));
+              }
+            });
+          });
+          req.on('error', (err) => reject(err));
+          req.write(postData);
+          req.end();
+        });
+        log('Funded from external faucet');
+      }
+      // Wait a moment for ledger to close
+      await new Promise(r => setTimeout(r, 2000));
+      balance = await client.getXrpBalance(wallet.address);
+      log(`Updated balance: ${balance} XRP`);
+    } else if (parseFloat(balance) === 0) {
+      log('Warning: Wallet not funded and no faucet URL provided, deployment will likely fail');
     }
 
-    // Create ContractCreate transaction
+    // Create ContractCreate transaction via manual construction + HTTP RPC
+    // (client.autofill may not support ContractCreate on xrpld 3.2.0)
     log('\nSubmitting contract creation transaction...');
+
+    const accountInfo = await client.request({
+      command: 'account_info',
+      account: wallet.address,
+    });
+
+    // Compute deploy flags
+    let deployFlags = 0;
+    if (immutable)      deployFlags |= 0x00010000;
+    if (code_immutable) deployFlags |= 0x00020000;
+    if (abi_immutable)  deployFlags |= 0x00040000;
+    if (undeletable)    deployFlags |= 0x00080000;
 
     const tx = {
       TransactionType: 'ContractCreate',
       Account: wallet.address,
-      ContractCode: wasmHex,
-      Functions: Functions,
       Fee: fee || '100000000', // 100 XRP default
+      Sequence: accountInfo.result.account_data.Sequence,
+      SigningPubKey: wallet.publicKey,
+      NetworkID: config.network_id,
     };
 
-    const prepared = await client.autofill(tx);
-    const signed = wallet.sign(prepared);
+    // Use ContractHash (reuse existing code) or ContractCode (new WASM)
+    if (reuse_code) {
+      tx.ContractHash = reuse_code;
+    } else {
+      tx.ContractCode = wasmHex;
+    }
+
+    if (Functions) {
+      tx.Functions = Functions;
+    }
+
+    if (deployFlags !== 0) {
+      tx.Flags = deployFlags;
+    }
+
+    if (owner) {
+      tx.ContractOwner = owner;
+    }
+
+    // Parse and add instance parameter values
+    if (params) {
+      try {
+        tx.InstanceParameterValues = JSON.parse(params);
+      } catch (e) {
+        throw new Error(`Failed to parse --params JSON: ${e.message}`);
+      }
+    }
+
+    const signed = wallet.sign(tx);
 
     log('Transaction ID:', signed.hash);
 
-    const result = await client.submitAndWait(signed.tx_blob);
+    const isLocal = network_url.includes('localhost') || network_url.includes('127.0.0.1');
+
+    let txResult = null;
+
+    if (isLocal) {
+      // Local nodes: use HTTP RPC to avoid WebSocket hangs under emulation
+      await client.disconnect();
+
+      const rpcUrl = network_url
+        .replace('ws://', 'http://').replace('wss://', 'https://')
+        .replace('localhost:6006', 'localhost:5005');
+
+      const submitResult = await httpRPC(rpcUrl, 'submit', { tx_blob: signed.tx_blob }, 120000);
+
+      log('Submit response:', JSON.stringify(submitResult).substring(0, 200));
+
+      if (submitResult.engine_result &&
+          submitResult.engine_result !== 'tesSUCCESS' &&
+          !submitResult.engine_result.startsWith('tes')) {
+        throw new Error(`Transaction rejected: ${submitResult.engine_result} - ${submitResult.engine_result_message}`);
+      }
+
+      // Wait for validation by polling tx via HTTP RPC
+      for (let attempt = 0; attempt < 60; attempt++) {
+        await new Promise(r => setTimeout(r, 1000));
+        try {
+          const txRes = await httpRPC(rpcUrl, 'tx', { transaction: signed.hash }, 10000);
+          if (txRes.validated) {
+            txResult = txRes;
+            break;
+          }
+        } catch (e) {
+          // Transaction not yet found, keep waiting
+        }
+      }
+    } else {
+      // Remote networks: use WebSocket submit and wait
+      const submitResult = await client.request({
+        command: 'submit',
+        tx_blob: signed.tx_blob,
+      });
+
+      log('Submit response:', JSON.stringify(submitResult.result).substring(0, 200));
+
+      if (submitResult.result.engine_result &&
+          submitResult.result.engine_result !== 'tesSUCCESS' &&
+          !submitResult.result.engine_result.startsWith('tes')) {
+        throw new Error(`Transaction rejected: ${submitResult.result.engine_result} - ${submitResult.result.engine_result_message}`);
+      }
+
+      // Poll for validation via WebSocket
+      for (let attempt = 0; attempt < 60; attempt++) {
+        await new Promise(r => setTimeout(r, 1000));
+        try {
+          const txRes = await client.request({
+            command: 'tx',
+            transaction: signed.hash,
+          });
+          if (txRes.result.validated) {
+            txResult = txRes.result;
+            break;
+          }
+        } catch (e) {
+          // Transaction not yet found, keep waiting
+        }
+      }
+
+      await client.disconnect();
+    }
+
+    if (!txResult) {
+      throw new Error('Transaction was not validated within 60 seconds');
+    }
 
     log('\n✓ Contract deployed successfully!');
 
     // Extract contract account from result
-    const meta = result.result.meta;
+    const meta = txResult.meta;
     let contractAccount = null;
     let contractIndex = null;
 
@@ -276,8 +476,7 @@ async function deployContract(config) {
       }
     }
 
-    await client.disconnect();
-    log('\n✓ Disconnected');
+    log('\n✓ Done');
 
     // Output deployment info as clean JSON to stdout
     const deploymentInfo = {
@@ -288,7 +487,7 @@ async function deployContract(config) {
         walletSeed: wallet.seed,
         contractAccount: contractAccount,
         contractIndex: contractIndex,
-        validated: result.result.validated,
+        validated: txResult.validated,
         meta: meta,
       },
     };
@@ -310,6 +509,47 @@ async function deployContract(config) {
     console.log(JSON.stringify(errorResult));
     process.exit(1);
   }
+}
+
+/**
+ * Send a JSON-RPC request via HTTP
+ */
+function httpRPC(rpcUrl, method, params, timeout) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(rpcUrl);
+    const protocol = url.protocol === 'https:' ? https : http;
+    const postData = JSON.stringify({ method, params: [params] });
+    const options = {
+      hostname: url.hostname,
+      port: url.port,
+      path: url.pathname,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+      },
+    };
+    const req = protocol.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.result && parsed.result.status === 'error') {
+            reject(new Error(`${parsed.result.error}: ${parsed.result.error_message}`));
+          } else {
+            resolve(parsed.result);
+          }
+        } catch (e) {
+          reject(new Error(`Failed to parse RPC response: ${e.message}`));
+        }
+      });
+    });
+    req.on('error', (err) => reject(err));
+    req.setTimeout(timeout || 30000, () => { req.destroy(); reject(new Error('RPC request timeout')); });
+    req.write(postData);
+    req.end();
+  });
 }
 
 // CLI interface
