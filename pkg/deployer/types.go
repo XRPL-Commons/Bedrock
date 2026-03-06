@@ -16,6 +16,7 @@ type DeploymentConfig struct {
 	WasmPath       string
 	ABIPath        string
 	NetworkURL     string
+	NetworkID      uint32
 	WalletSeed     string
 	Algorithm      string
 	FaucetURL      string
@@ -26,4 +27,5 @@ type DeploymentConfig struct {
 	Undeletable    bool
 	ReuseCode      string // Existing ContractSource hash to reference
 	Params         string // Instance parameter values as JSON
+	Owner          string // Optional contract owner (defaults to Account)
 }

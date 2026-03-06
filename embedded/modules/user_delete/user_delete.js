@@ -27,6 +27,7 @@ async function contractUserDelete(config) {
   log('Deleting user data from contract...\n');
 
   const client = new xrpl.Client(network_url);
+  client.apiVersion = 1;
 
   try {
     await client.connect();

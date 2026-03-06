@@ -1,6 +1,9 @@
 package config
 
-import "time"
+import (
+	"runtime"
+	"time"
+)
 
 // Config represents the bedrock.toml configuration
 type Config struct {
@@ -78,11 +81,25 @@ type DocConfig struct {
 	Output string `toml:"output"`
 }
 
-// DefaultLocalNodeConfig returns default local node configuration
+const (
+	// DefaultDockerImageAMD64 is the upstream amd64 image from Transia
+	DefaultDockerImageAMD64 = "transia/cluster:f5d78179c9d1fbaf8bff8b77a052e263df90faa1"
+	// DefaultDockerImageARM64 is a locally-built native arm64 image.
+	// Build with: ./docker/build-arm64.sh
+	DefaultDockerImageARM64 = "bedrock-xrpld:arm64-local"
+)
+
+// DefaultLocalNodeConfig returns default local node configuration.
+// On arm64 (Apple Silicon), it defaults to the native arm64 image to avoid
+// WASM execution hangs under Rosetta/QEMU emulation.
 func DefaultLocalNodeConfig() LocalNodeConfig {
+	image := DefaultDockerImageAMD64
+	if runtime.GOARCH == "arm64" {
+		image = DefaultDockerImageARM64
+	}
 	return LocalNodeConfig{
 		ConfigDir:      ".bedrock/node-config",
-		DockerImage:    "transia/alphanet:latest",
+		DockerImage:    image,
 		LedgerInterval: 1000, // 1 second default
 	}
 }

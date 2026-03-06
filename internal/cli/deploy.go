@@ -28,6 +28,7 @@ var (
 	deployUndeletable   bool
 	deployReuseCode     string
 	deployParams        string
+	deployOwner         string
 	deployFee           string
 )
 
@@ -60,6 +61,7 @@ func init() {
 	deployCmd.Flags().BoolVar(&deployUndeletable, "undeletable", false, "Set lsfUndeletable flag (contract cannot be deleted)")
 	deployCmd.Flags().StringVar(&deployReuseCode, "reuse-code", "", "Reference existing ContractSource by hash")
 	deployCmd.Flags().StringVar(&deployParams, "params", "", "Instance parameter values as JSON")
+	deployCmd.Flags().StringVar(&deployOwner, "owner", "", "Contract owner address (defaults to deployer)")
 	deployCmd.Flags().StringVar(&deployFee, "fee", "", "Transaction fee in drops")
 }
 
@@ -218,6 +220,7 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		WasmPath:      wasmPath,
 		ABIPath:       abiPath,
 		NetworkURL:    networkCfg.URL,
+		NetworkID:     networkCfg.NetworkID,
 		WalletSeed:    walletSeed,
 		Algorithm:     deployAlgorithm,
 		FaucetURL:     faucetURL,
@@ -228,6 +231,7 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		Undeletable:   deployUndeletable,
 		ReuseCode:     deployReuseCode,
 		Params:        deployParams,
+		Owner:         deployOwner,
 	})
 
 	if err != nil {

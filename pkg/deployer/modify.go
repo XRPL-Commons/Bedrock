@@ -15,6 +15,12 @@ type ModifyConfig struct {
 	WasmPath        string // Optional: new WASM code
 	ABIPath         string // Optional: new ABI
 	Fee             string
+	Owner           string // Optional: new contract owner
+	ContractHash    string // Optional: reference existing ContractSource by hash
+	Immutable       bool
+	CodeImmutable   bool
+	ABIImmutable    bool
+	Undeletable     bool
 }
 
 // ModifyResult represents the result of a contract modification
@@ -49,6 +55,23 @@ type UserDeleteConfig struct {
 	Fee             string
 }
 
+// ClawbackConfig holds configuration for clawing back tokens from a contract
+type ClawbackConfig struct {
+	ContractAccount string
+	Amount          string
+	NetworkURL      string
+	WalletSeed      string
+	Algorithm       string
+	Fee             string
+}
+
+// ClawbackResult represents the result of a contract clawback
+type ClawbackResult struct {
+	TxHash    string                 `json:"txHash"`
+	Validated bool                   `json:"validated"`
+	Meta      map[string]interface{} `json:"meta"`
+}
+
 // Modify updates a deployed contract's code or ABI
 func (d *Deployer) Modify(ctx context.Context, config ModifyConfig) (*ModifyResult, error) {
 	jsConfig := map[string]interface{}{
@@ -65,6 +88,24 @@ func (d *Deployer) Modify(ctx context.Context, config ModifyConfig) (*ModifyResu
 	}
 	if config.ABIPath != "" {
 		jsConfig["abi_path"] = config.ABIPath
+	}
+	if config.Owner != "" {
+		jsConfig["owner"] = config.Owner
+	}
+	if config.ContractHash != "" {
+		jsConfig["contract_hash"] = config.ContractHash
+	}
+	if config.Immutable {
+		jsConfig["immutable"] = true
+	}
+	if config.CodeImmutable {
+		jsConfig["code_immutable"] = true
+	}
+	if config.ABIImmutable {
+		jsConfig["abi_immutable"] = true
+	}
+	if config.Undeletable {
+		jsConfig["undeletable"] = true
 	}
 
 	result, err := d.executor.ExecuteModule(ctx, "modify.js", jsConfig)
@@ -102,6 +143,31 @@ func (d *Deployer) Delete(ctx context.Context, config DeleteConfig) (*DeleteResu
 	}
 
 	return &deleteResult, nil
+}
+
+// Clawback reclaims tokens from a contract (issuer only)
+func (d *Deployer) Clawback(ctx context.Context, config ClawbackConfig) (*ClawbackResult, error) {
+	jsConfig := map[string]interface{}{
+		"contract_account": config.ContractAccount,
+		"amount":           config.Amount,
+		"network_url":      config.NetworkURL,
+		"wallet_seed":      config.WalletSeed,
+		"algorithm":        config.Algorithm,
+		"fee":              config.Fee,
+		"verbose":          d.verbose,
+	}
+
+	result, err := d.executor.ExecuteModule(ctx, "clawback.js", jsConfig)
+	if err != nil {
+		return nil, fmt.Errorf("contract clawback failed: %w", err)
+	}
+
+	var clawbackResult ClawbackResult
+	if err := json.Unmarshal(result.Data, &clawbackResult); err != nil {
+		return nil, fmt.Errorf("failed to parse clawback result: %w", err)
+	}
+
+	return &clawbackResult, nil
 }
 
 // UserDelete removes user's data from a contract and recovers reserves

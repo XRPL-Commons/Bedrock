@@ -32,6 +32,12 @@ Examples:
 //go:embed templates/genesis.json
 var genesisTemplate string
 
+//go:embed templates/xrpld.cfg
+var xrpldCfgTemplate string
+
+//go:embed templates/validators.txt
+var validatorsTemplate string
+
 func init() {
 	rootCmd.AddCommand(initCmd)
 
@@ -89,7 +95,7 @@ target = "wasm32-unknown-unknown"
 
 [local_node]
 config_dir = ".bedrock/node-config"
-docker_image = "transia/alphanet:latest"
+docker_image = "transia/cluster:f5d78179c9d1fbaf8bff8b77a052e263df90faa1"
 ledger_interval = 1000
 
 [networks.local]
@@ -148,6 +154,18 @@ panic = "abort"
 	genesisPath := filepath.Join(projectName, ".bedrock", "node-config", "genesis.json")
 	if err := os.WriteFile(genesisPath, []byte(genesisTemplate), 0644); err != nil {
 		return fmt.Errorf("failed to create genesis.json: %w", err)
+	}
+
+	// Write embedded xrpld.cfg template
+	xrpldCfgPath := filepath.Join(projectName, ".bedrock", "node-config", "xrpld.cfg")
+	if err := os.WriteFile(xrpldCfgPath, []byte(xrpldCfgTemplate), 0644); err != nil {
+		return fmt.Errorf("failed to create xrpld.cfg: %w", err)
+	}
+
+	// Write embedded validators.txt template
+	validatorsPath := filepath.Join(projectName, ".bedrock", "node-config", "validators.txt")
+	if err := os.WriteFile(validatorsPath, []byte(validatorsTemplate), 0644); err != nil {
+		return fmt.Errorf("failed to create validators.txt: %w", err)
 	}
 
 	// Create .gitignore

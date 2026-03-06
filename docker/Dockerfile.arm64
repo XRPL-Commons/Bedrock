@@ -1,0 +1,131 @@
+# Multi-stage build for native arm64 xrpld with smart contracts support.
+#
+# The transia/cluster image is amd64-only. Running it under Rosetta/QEMU
+# on Apple Silicon causes WASM execution to hang. This Dockerfile builds
+# xrpld natively for arm64 from the Transia-RnD/rippled smart-contracts branch.
+#
+# Build time: 30-60+ minutes (Boost, gRPC, wasmi compilation).
+# Use docker/build-arm64.sh for convenience.
+
+# ---------------------------------------------------------------------------
+# Stage 1: Build
+# ---------------------------------------------------------------------------
+FROM ubuntu:22.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc-12 \
+    g++-12 \
+    cmake \
+    python3 \
+    python3-pip \
+    python3-venv \
+    git \
+    pkg-config \
+    curl \
+    ca-certificates \
+    wget \
+    ninja-build \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set gcc-12 as default compiler
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100 \
+    && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100 \
+    && update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-12 100 \
+    && update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++-12 100
+
+# Install Rust toolchain (required for wasmi WASM interpreter)
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install Conan 2
+RUN pip3 install 'conan>=2.17,<3'
+
+# Configure Conan: detect profile and add XRPLF remote for patched recipes
+RUN conan profile detect \
+    && conan remote add --index 0 xrplf https://conan.ripplex.io
+
+# Clone rippled at the smart contracts commit
+# The commit f5d78179 is the HEAD of alphanet-develop (a squash of dangell/smart-contracts).
+ARG RIPPLED_BRANCH=alphanet-develop
+ARG RIPPLED_COMMIT=f5d78179c9d1fbaf8bff8b77a052e263df90faa1
+RUN git clone --single-branch --branch "${RIPPLED_BRANCH}" \
+    https://github.com/Transia-RnD/rippled.git /rippled \
+    && cd /rippled \
+    && git checkout ${RIPPLED_COMMIT}
+
+WORKDIR /rippled
+
+# Export patched recipes from XRPLF conan-center-index.
+# These are needed for ed25519, grpc, secp256k1, snappy, soci, wasmi.
+RUN git clone --sparse --filter=blob:none https://github.com/XRPLF/conan-center-index.git /cci \
+    && cd /cci \
+    && git sparse-checkout add recipes/ed25519/all \
+                              recipes/grpc/all \
+                              recipes/secp256k1/all \
+                              recipes/snappy/all \
+                              recipes/soci/all \
+                              recipes/wasmi/all
+
+# Patch wasmi recipe to add 0.42.1 source URL (XRPLF recipe only has 1.0.x).
+# wasmi 0.42.1 comes from upstream wasmi-labs/wasmi, not XRPLF/wasmi.
+RUN printf '  "0.42.1":\n    url: https://github.com/wasmi-labs/wasmi/archive/refs/tags/v0.42.1.tar.gz\n    sha256: 2a5697be33c7afce8f671af4a5a3621d9e93ce55d253d31bd8201458e465fbb8\n' \
+    >> /cci/recipes/wasmi/all/conandata.yml
+
+# Export each patched recipe into local Conan cache.
+# Use versions from conan.lock where possible, fall back to latest.
+RUN cd /rippled && \
+    for recipe in ed25519 grpc secp256k1 snappy soci wasmi; do \
+        version=$(sed -nE "s@.+${recipe}/(.+)#.+@\1@p" conan.lock 2>/dev/null | head -n1); \
+        if [ -n "$version" ] && [ -d "/cci/recipes/${recipe}/all" ]; then \
+            echo "Exporting ${recipe}/${version}..." && \
+            conan export --version "${version}" "/cci/recipes/${recipe}/all" || true; \
+        fi; \
+    done
+
+# Install Conan dependencies (this is the longest step - builds Boost, gRPC, etc.)
+RUN mkdir -p .build && cd .build \
+    && conan install .. \
+       --output-folder . \
+       --build missing \
+       --lockfile="" \
+       --settings build_type=Release \
+       --settings compiler=gcc \
+       --settings compiler.version=12 \
+       --settings compiler.cppstd=20 \
+       -o xrpld=True
+
+# Configure CMake
+RUN cd .build \
+    && cmake .. \
+       -G Ninja \
+       -DCMAKE_TOOLCHAIN_FILE=build/generators/conan_toolchain.cmake \
+       -DCMAKE_BUILD_TYPE=Release \
+       -Dxrpld=ON \
+       -Dtests=OFF
+
+# Build xrpld
+RUN cd .build && cmake --build . --parallel $(nproc)
+
+# ---------------------------------------------------------------------------
+# Stage 2: Runtime
+# ---------------------------------------------------------------------------
+FROM ubuntu:22.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libssl3 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the xrpld binary to the expected location
+COPY --from=builder /rippled/.build/xrpld /app/xrpld
+
+# Create config directory
+RUN mkdir -p /opt/ripple/config
+
+EXPOSE 5005 6006 51235
+
+ENTRYPOINT ["/app/xrpld"]

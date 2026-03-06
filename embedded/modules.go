@@ -12,7 +12,7 @@ import (
 	"sync"
 )
 
-//go:embed modules/deploy/deploy.js modules/call/call.js modules/faucet/faucet.js modules/modify/modify.js modules/delete/delete.js modules/user_delete/user_delete.js modules/package.json
+//go:embed modules/deploy/deploy.js modules/call/call.js modules/faucet/faucet.js modules/modify/modify.js modules/delete/delete.js modules/user_delete/user_delete.js modules/clawback/clawback.js modules/package.json modules/postinstall.js
 var ModulesFS embed.FS
 
 var (
@@ -105,6 +105,20 @@ func getModulesVersion() (string, error) {
 	}
 	hasher.Write(userDeleteJS)
 
+	// Hash clawback.js
+	clawbackJS, err := ModulesFS.ReadFile("modules/clawback/clawback.js")
+	if err != nil {
+		return "", err
+	}
+	hasher.Write(clawbackJS)
+
+	// Hash postinstall.js
+	postinstallJS, err := ModulesFS.ReadFile("modules/postinstall.js")
+	if err != nil {
+		return "", err
+	}
+	hasher.Write(postinstallJS)
+
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
@@ -183,6 +197,17 @@ func SetupModules() (string, error) {
 			return "", fmt.Errorf("failed to write package.json: %w", err)
 		}
 
+		// Extract postinstall.js (patches binary codec definitions)
+		postinstallJS, err := ModulesFS.ReadFile("modules/postinstall.js")
+		if err != nil {
+			return "", fmt.Errorf("failed to read postinstall.js: %w", err)
+		}
+
+		postinstallPath := filepath.Join(cache, "postinstall.js")
+		if err := os.WriteFile(postinstallPath, postinstallJS, 0755); err != nil {
+			return "", fmt.Errorf("failed to write postinstall.js: %w", err)
+		}
+
 		// Extract deploy.js
 		deployJS, err := ModulesFS.ReadFile("modules/deploy/deploy.js")
 		if err != nil {
@@ -247,6 +272,17 @@ func SetupModules() (string, error) {
 		userDeletePath := filepath.Join(cache, "user_delete.js")
 		if err := os.WriteFile(userDeletePath, userDeleteJS, 0755); err != nil {
 			return "", fmt.Errorf("failed to write user_delete.js: %w", err)
+		}
+
+		// Extract clawback.js
+		clawbackJS, err := ModulesFS.ReadFile("modules/clawback/clawback.js")
+		if err != nil {
+			return "", fmt.Errorf("failed to read clawback.js: %w", err)
+		}
+
+		clawbackPath := filepath.Join(cache, "clawback.js")
+		if err := os.WriteFile(clawbackPath, clawbackJS, 0755); err != nil {
+			return "", fmt.Errorf("failed to write clawback.js: %w", err)
 		}
 
 		// Install npm dependencies

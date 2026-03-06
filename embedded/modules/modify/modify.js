@@ -49,6 +49,12 @@ async function modifyContract(config) {
     abi_path,
     fee,
     verbose,
+    owner,
+    contract_hash,
+    immutable,
+    code_immutable,
+    abi_immutable,
+    undeletable,
   } = config;
 
   const log = verbose ? console.error.bind(console) : () => {};
@@ -56,6 +62,7 @@ async function modifyContract(config) {
   log('Modifying contract on XRPL...\n');
 
   const client = new xrpl.Client(network_url);
+  client.apiVersion = 1;
 
   try {
     await client.connect();
@@ -73,8 +80,11 @@ async function modifyContract(config) {
       Fee: fee || '10000000',
     };
 
-    // Optionally update WASM code
-    if (wasm_path && fs.existsSync(wasm_path)) {
+    // Optionally update WASM code (or reference by hash)
+    if (contract_hash) {
+      tx.ContractHash = contract_hash;
+      log(`Referencing existing ContractSource: ${contract_hash}`);
+    } else if (wasm_path && fs.existsSync(wasm_path)) {
       const wasmBytes = fs.readFileSync(wasm_path);
       tx.ContractCode = wasmBytes.toString('hex').toUpperCase();
       log(`Updated WASM: ${wasmBytes.length} bytes`);
@@ -87,6 +97,24 @@ async function modifyContract(config) {
       const functionNames = abi.functions.map(f => f.name);
       tx.Functions = buildFunctionsFromABI(abi, functionNames);
       log(`Updated ABI: ${abi.functions.length} functions`);
+    }
+
+    // Optionally transfer ownership
+    if (owner) {
+      tx.ContractOwner = owner;
+      log(`Transferring ownership to: ${owner}`);
+    }
+
+    // Compute modify flags
+    let modifyFlags = 0;
+    if (immutable)      modifyFlags |= 0x00010000;
+    if (code_immutable) modifyFlags |= 0x00020000;
+    if (abi_immutable)  modifyFlags |= 0x00040000;
+    if (undeletable)    modifyFlags |= 0x00080000;
+
+    if (modifyFlags !== 0) {
+      tx.Flags = modifyFlags;
+      log(`Setting flags: 0x${modifyFlags.toString(16)}`);
     }
 
     const prepared = await client.autofill(tx);

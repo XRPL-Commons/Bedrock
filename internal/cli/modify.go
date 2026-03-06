@@ -11,23 +11,31 @@ import (
 )
 
 var (
-	modifyNetwork   string
-	modifyWallet    string
-	modifyWasm      string
-	modifyABI       string
-	modifyAlgorithm string
-	modifyFee       string
+	modifyNetwork       string
+	modifyWallet        string
+	modifyWasm          string
+	modifyABI           string
+	modifyAlgorithm     string
+	modifyFee           string
+	modifyOwner         string
+	modifyHash          string
+	modifyImmutable     bool
+	modifyCodeImmutable bool
+	modifyABIImmutable  bool
+	modifyUndeletable   bool
 )
 
 var modifyCmd = &cobra.Command{
 	Use:   "modify <contract-account>",
 	Short: "Modify a deployed contract",
-	Long: `Update a deployed contract's code or ABI via ContractModify transaction.
+	Long: `Update a deployed contract's code, ABI, owner, or flags via ContractModify transaction.
 
 Examples:
   bedrock modify rContract123... --wallet sXXX... --wasm contract.wasm
   bedrock modify rContract123... --wallet sXXX... --abi abi.json
-  bedrock modify rContract123... --wallet sXXX... --wasm contract.wasm --abi abi.json`,
+  bedrock modify rContract123... --wallet sXXX... --owner rNewOwner...
+  bedrock modify rContract123... --wallet sXXX... --immutable
+  bedrock modify rContract123... --wallet sXXX... --hash ABCDEF1234...`,
 	Args: cobra.ExactArgs(1),
 	RunE: runModify,
 }
@@ -41,6 +49,12 @@ func init() {
 	modifyCmd.Flags().StringVar(&modifyABI, "abi", "", "New ABI file path")
 	modifyCmd.Flags().StringVar(&modifyAlgorithm, "algorithm", "secp256k1", "Cryptographic algorithm")
 	modifyCmd.Flags().StringVar(&modifyFee, "fee", "10000000", "Transaction fee in drops")
+	modifyCmd.Flags().StringVar(&modifyOwner, "owner", "", "New contract owner address")
+	modifyCmd.Flags().StringVar(&modifyHash, "hash", "", "Reference existing ContractSource by hash")
+	modifyCmd.Flags().BoolVar(&modifyImmutable, "immutable", false, "Set lsfImmutable flag")
+	modifyCmd.Flags().BoolVar(&modifyCodeImmutable, "code-immutable", false, "Set lsfCodeImmutable flag")
+	modifyCmd.Flags().BoolVar(&modifyABIImmutable, "abi-immutable", false, "Set lsfABIImmutable flag")
+	modifyCmd.Flags().BoolVar(&modifyUndeletable, "undeletable", false, "Set lsfUndeletable flag")
 
 	modifyCmd.MarkFlagRequired("wallet")
 }
@@ -62,8 +76,9 @@ func runModify(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if modifyWasm == "" && modifyABI == "" {
-		return fmt.Errorf("at least one of --wasm or --abi must be provided")
+	hasFlags := modifyImmutable || modifyCodeImmutable || modifyABIImmutable || modifyUndeletable
+	if modifyWasm == "" && modifyABI == "" && modifyOwner == "" && modifyHash == "" && !hasFlags {
+		return fmt.Errorf("at least one of --wasm, --abi, --owner, --hash, or a flag must be provided")
 	}
 
 	color.Cyan("Modifying contract\n")
@@ -94,6 +109,12 @@ func runModify(cmd *cobra.Command, args []string) error {
 		WasmPath:        modifyWasm,
 		ABIPath:         modifyABI,
 		Fee:             modifyFee,
+		Owner:           modifyOwner,
+		ContractHash:    modifyHash,
+		Immutable:       modifyImmutable,
+		CodeImmutable:   modifyCodeImmutable,
+		ABIImmutable:    modifyABIImmutable,
+		Undeletable:     modifyUndeletable,
 	})
 
 	if err != nil {

@@ -34,6 +34,7 @@ func (d *Deployer) Deploy(ctx context.Context, config DeploymentConfig) (*Deploy
 		"wasm_path":   config.WasmPath,
 		"abi_path":    config.ABIPath,
 		"network_url": config.NetworkURL,
+		"network_id":  config.NetworkID,
 		"algorithm":   config.Algorithm,
 		"verbose":     d.verbose,
 	}
@@ -67,6 +68,9 @@ func (d *Deployer) Deploy(ctx context.Context, config DeploymentConfig) (*Deploy
 	}
 	if config.Params != "" {
 		jsConfig["params"] = config.Params
+	}
+	if config.Owner != "" {
+		jsConfig["owner"] = config.Owner
 	}
 
 	// Execute deploy.js module

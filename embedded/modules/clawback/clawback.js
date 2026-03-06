@@ -1,19 +1,21 @@
 #!/usr/bin/env node
 
 /**
- * XRPL Smart Contract Delete Module
+ * XRPL Smart Contract Clawback Module
  *
- * Handles deleting deployed contracts via ContractDelete transaction.
+ * Handles clawing back tokens from contracts via ContractClawback transaction.
+ * This allows token issuers to reclaim tokens held by a contract.
  *
- * Usage: node delete.js <config-json-path>
+ * Usage: node clawback.js <config-json-path>
  */
 
 const xrpl = require('@transia/xrpl');
 const fs = require('fs');
 
-async function deleteContract(config) {
+async function clawbackContract(config) {
   const {
     contract_account,
+    amount,
     network_url,
     wallet_seed,
     algorithm,
@@ -23,7 +25,7 @@ async function deleteContract(config) {
 
   const log = verbose ? console.error.bind(console) : () => {};
 
-  log('Deleting contract from XRPL...\n');
+  log('Clawing back tokens from contract...\n');
 
   const client = new xrpl.Client(network_url);
   client.apiVersion = 1;
@@ -37,12 +39,33 @@ async function deleteContract(config) {
       ? xrpl.Wallet.fromSeed(wallet_seed, { algorithm: algo })
       : xrpl.Wallet.fromSeed(wallet_seed);
 
+    // Parse the amount - could be drops string or currency object
+    let parsedAmount;
+    if (typeof amount === 'string' && amount.includes('/')) {
+      // Format: "value/currency/issuer"
+      const parts = amount.split('/');
+      if (parts.length !== 3) {
+        throw new Error('Amount format must be "value/currency/issuer" or drops string');
+      }
+      parsedAmount = {
+        value: parts[0],
+        currency: parts[1],
+        issuer: parts[2],
+      };
+    } else {
+      // Assume it's already a parsed object or drops string
+      parsedAmount = amount;
+    }
+
     const tx = {
-      TransactionType: 'ContractDelete',
+      TransactionType: 'ContractClawback',
       Account: wallet.address,
       ContractAccount: contract_account,
+      Amount: parsedAmount,
       Fee: fee || '1000000',
     };
+
+    log('Transaction:', JSON.stringify(tx, null, 2));
 
     const prepared = await client.autofill(tx);
     const signed = wallet.sign(prepared);
@@ -78,7 +101,7 @@ async function deleteContract(config) {
 if (require.main === module) {
   const args = process.argv.slice(2);
   if (args.length < 1) {
-    console.error('Usage: node delete.js <config-json-path>');
+    console.error('Usage: node clawback.js <config-json-path>');
     process.exit(1);
   }
 
@@ -93,7 +116,7 @@ if (require.main === module) {
   }
 
   const configContent = fs.readFileSync(configPath, 'utf8');
-  deleteContract(JSON.parse(configContent));
+  clawbackContract(JSON.parse(configContent));
 }
 
-module.exports = { deleteContract };
+module.exports = { clawbackContract };

@@ -11,6 +11,7 @@ import (
 
 var (
 	scriptTemplate string
+	scriptNetwork  string
 )
 
 var scriptCmd = &cobra.Command{
@@ -35,6 +36,7 @@ func init() {
 	rootCmd.AddCommand(scriptCmd)
 
 	scriptCmd.Flags().StringVar(&scriptTemplate, "template", "", "Use a built-in template (deploy-and-test)")
+	scriptCmd.Flags().StringVar(&scriptNetwork, "network", "", "Override the script's target network")
 }
 
 func runScript(cmd *cobra.Command, args []string) error {
@@ -64,6 +66,11 @@ func runScript(cmd *cobra.Command, args []string) error {
 		scriptLabel = args[0]
 	} else {
 		return fmt.Errorf("provide a script file or use --template")
+	}
+
+	// Override network if --network flag is provided
+	if scriptNetwork != "" {
+		s.Network = scriptNetwork
 	}
 
 	color.Cyan("Running script: %s\n\n", scriptLabel)

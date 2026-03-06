@@ -135,6 +135,7 @@ func (r *Runner) executeDeploy(ctx context.Context, step Step, networkName strin
 		WasmPath:   wasmPath,
 		ABIPath:    abiPath,
 		NetworkURL: networkCfg.URL,
+		NetworkID:  networkCfg.NetworkID,
 		WalletSeed: walletSeed,
 		Algorithm:  getStringConfig(step.Config, "algorithm", "secp256k1"),
 		FaucetURL:  networkCfg.FaucetURL,

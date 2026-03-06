@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "JavaScript modules for XRPL smart contract deployment and interaction",
   "private": true,
+  "scripts": {
+    "postinstall": "node postinstall.js"
+  },
   "dependencies": {
     "@transia/xrpl": "^4.4.6-alpha.0"
   }

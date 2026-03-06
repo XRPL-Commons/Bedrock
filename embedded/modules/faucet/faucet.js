@@ -93,6 +93,7 @@ async function requestFaucet(config) {
     if (network_url) {
       log('\nChecking balance...');
       const client = new xrpl.Client(network_url);
+      client.apiVersion = 1;
       await client.connect();
       balance = await client.getXrpBalance(address);
       await client.disconnect();
@@ -130,6 +131,7 @@ async function requestFaucet(config) {
  */
 async function fundFromGenesis(networkUrl, destinationAddress, log) {
   const client = new xrpl.Client(networkUrl);
+  client.apiVersion = 1;
   await client.connect();
 
   try {
