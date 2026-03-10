@@ -36,6 +36,8 @@
 
 const xrpl = require('@transia/xrpl');
 const fs = require('fs');
+const http = require('http');
+const https = require('https');
 
 /**
  * Build Parameters array from ABI and provided values
@@ -59,10 +61,8 @@ function buildParametersFromABI(functionDef, paramValues) {
 
     if (value !== undefined) {
       parameters.push({
-        ParameterValue: {
-          ParameterFlag: paramDef.flag,
-          ParameterValue: formatParameterValue(paramDef.type, value),
-        },
+        ParameterFlag: paramDef.flag,
+        ParameterValue: formatParameterValue(paramDef.type, value),
       });
     }
   }
@@ -161,6 +161,7 @@ async function callContract(config) {
   log('Calling smart contract on XRPL...\n');
 
   const client = new xrpl.Client(network_url);
+  client.apiVersion = 1;
 
   try {
     await client.connect();
@@ -236,47 +237,105 @@ async function callContract(config) {
       .toString('hex')
       .toUpperCase();
 
-    // Get account sequence and current ledger manually to avoid autofill
-    const [accountInfo, ledgerInfo] = await Promise.all([
-      client.request({
-        command: 'account_info',
-        account: wallet.address,
-      }),
-      client.request({
-        command: 'ledger',
-        ledger_index: 'validated',
-      })
-    ]);
+    // Manual construction: autofill tries to simulate ContractCall which nodes may not support
+    const accountInfo = await client.request({
+      command: 'account_info',
+      account: wallet.address,
+    });
 
-    const currentLedger = ledgerInfo.result.ledger_index;
-    log(`Current ledger: ${currentLedger}`);
-    log(`Target LastLedgerSequence: ${currentLedger + 10}`);
-    
     const tx = {
       TransactionType: 'ContractCall',
       Account: wallet.address,
       ContractAccount: contract_account,
       FunctionName: functionNameHex,
       Parameters: Parameters,
-      ComputationAllowance: computation_allowance || '1000000',
+      ComputationAllowance: parseInt(computation_allowance || '1000000'),
       Fee: fee || '1000000',
       Sequence: accountInfo.result.account_data.Sequence,
-      LastLedgerSequence: currentLedger + 10,
       SigningPubKey: wallet.publicKey,
-      NetworkID: config.network_id
+      NetworkID: config.network_id,
     };
 
-    const prepared = tx;
-    const signed = wallet.sign(prepared);
+    const signed = wallet.sign(tx);
 
     log('Transaction ID:', signed.hash);
 
-    const result = await client.submitAndWait(signed.tx_blob);
+    const isLocal = network_url.includes('localhost') || network_url.includes('127.0.0.1');
+
+    let txResult = null;
+
+    if (isLocal) {
+      // Local nodes: use HTTP RPC to avoid WebSocket hangs under emulation
+      await client.disconnect();
+
+      const rpcUrl = network_url
+        .replace('ws://', 'http://').replace('wss://', 'https://')
+        .replace('localhost:6006', 'localhost:5005');
+
+      const submitResult = await httpRPC(rpcUrl, 'submit', { tx_blob: signed.tx_blob }, 120000);
+
+      log('Submit response:', JSON.stringify(submitResult).substring(0, 200));
+
+      if (submitResult.engine_result &&
+          submitResult.engine_result !== 'tesSUCCESS' &&
+          !submitResult.engine_result.startsWith('tes')) {
+        throw new Error(`Transaction rejected: ${submitResult.engine_result} - ${submitResult.engine_result_message}`);
+      }
+
+      // Wait for validation by polling tx via HTTP RPC
+      for (let attempt = 0; attempt < 60; attempt++) {
+        await new Promise(r => setTimeout(r, 1000));
+        try {
+          const txRes = await httpRPC(rpcUrl, 'tx', { transaction: signed.hash }, 10000);
+          if (txRes.validated) {
+            txResult = txRes;
+            break;
+          }
+        } catch (e) {
+          // Transaction not yet found, keep waiting
+        }
+      }
+    } else {
+      // Remote networks: use WebSocket submit and wait
+      const submitResult = await client.request({
+        command: 'submit',
+        tx_blob: signed.tx_blob,
+      });
+
+      log('Submit response:', JSON.stringify(submitResult.result).substring(0, 200));
+
+      if (submitResult.result.engine_result &&
+          submitResult.result.engine_result !== 'tesSUCCESS' &&
+          !submitResult.result.engine_result.startsWith('tes')) {
+        throw new Error(`Transaction rejected: ${submitResult.result.engine_result} - ${submitResult.result.engine_result_message}`);
+      }
+
+      // Poll for validation via WebSocket
+      for (let attempt = 0; attempt < 60; attempt++) {
+        await new Promise(r => setTimeout(r, 1000));
+        try {
+          const txRes = await client.request({
+            command: 'tx',
+            transaction: signed.hash,
+          });
+          if (txRes.result.validated) {
+            txResult = txRes.result;
+            break;
+          }
+        } catch (e) {
+          // Transaction not yet found, keep waiting
+        }
+      }
+
+      await client.disconnect();
+    }
+
+    if (!txResult) {
+      throw new Error('Transaction was not validated within 60 seconds');
+    }
 
     log('\n✓ Contract function called successfully!');
 
-    // Extract result information
-    const txResult = result.result;
     const meta = txResult.meta;
 
     log('\nTransaction Status:');
@@ -304,16 +363,13 @@ async function callContract(config) {
     if (meta?.GasUsed !== undefined) {
       log('\nGas/Computation Used:');
       log(`  Gas Used: ${meta.GasUsed}`);
-      log(`  Allowance: ${prepared.ComputationAllowance}`);
+      log(`  Allowance: ${tx.ComputationAllowance}`);
       const percentage = (
-        (meta.GasUsed / parseInt(prepared.ComputationAllowance)) *
+        (meta.GasUsed / parseInt(tx.ComputationAllowance)) *
         100
       ).toFixed(2);
       log(`  Percentage: ${percentage}%`);
     }
-
-    await client.disconnect();
-    log('\n✓ Disconnected');
 
     // Output call result as clean JSON to stdout
     const callResult = {
@@ -346,6 +402,47 @@ async function callContract(config) {
     console.log(JSON.stringify(errorResult));
     process.exit(1);
   }
+}
+
+/**
+ * Send a JSON-RPC request via HTTP
+ */
+function httpRPC(rpcUrl, method, params, timeout) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(rpcUrl);
+    const protocol = url.protocol === 'https:' ? https : http;
+    const postData = JSON.stringify({ method, params: [params] });
+    const options = {
+      hostname: url.hostname,
+      port: url.port,
+      path: url.pathname,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+      },
+    };
+    const req = protocol.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.result && parsed.result.status === 'error') {
+            reject(new Error(`${parsed.result.error}: ${parsed.result.error_message}`));
+          } else {
+            resolve(parsed.result);
+          }
+        } catch (e) {
+          reject(new Error(`Failed to parse RPC response: ${e.message}`));
+        }
+      });
+    });
+    req.on('error', (err) => reject(err));
+    req.setTimeout(timeout || 30000, () => { req.destroy(); reject(new Error('RPC request timeout')); });
+    req.write(postData);
+    req.end();
+  });
 }
 
 // CLI interface

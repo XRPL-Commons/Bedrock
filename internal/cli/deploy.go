@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -15,12 +16,20 @@ import (
 )
 
 var (
-	deployNetwork   string
-	deployWallet    string
-	deployABI       string
-	deploySkipBuild bool
-	deploySkipABI   bool
-	deployAlgorithm string
+	deployNetwork       string
+	deployWallet        string
+	deployABI           string
+	deploySkipBuild     bool
+	deploySkipABI       bool
+	deployAlgorithm     string
+	deployImmutable     bool
+	deployCodeImmutable bool
+	deployABIImmutable  bool
+	deployUndeletable   bool
+	deployReuseCode     string
+	deployParams        string
+	deployOwner         string
+	deployFee           string
 )
 
 var deployCmd = &cobra.Command{
@@ -46,6 +55,14 @@ func init() {
 	deployCmd.Flags().BoolVar(&deploySkipBuild, "skip-build", false, "Skip building the contract")
 	deployCmd.Flags().BoolVar(&deploySkipABI, "skip-abi", false, "Skip generating ABI")
 	deployCmd.Flags().StringVar(&deployAlgorithm, "algorithm", "secp256k1", "Cryptographic algorithm (secp256k1, ed25519)")
+	deployCmd.Flags().BoolVar(&deployImmutable, "immutable", false, "Set lsfImmutable flag (no modifications allowed)")
+	deployCmd.Flags().BoolVar(&deployCodeImmutable, "code-immutable", false, "Set lsfCodeImmutable flag (code cannot be changed)")
+	deployCmd.Flags().BoolVar(&deployABIImmutable, "abi-immutable", false, "Set lsfABIImmutable flag (ABI cannot be changed)")
+	deployCmd.Flags().BoolVar(&deployUndeletable, "undeletable", false, "Set lsfUndeletable flag (contract cannot be deleted)")
+	deployCmd.Flags().StringVar(&deployReuseCode, "reuse-code", "", "Reference existing ContractSource by hash")
+	deployCmd.Flags().StringVar(&deployParams, "params", "", "Instance parameter values as JSON")
+	deployCmd.Flags().StringVar(&deployOwner, "owner", "", "Contract owner address (defaults to deployer)")
+	deployCmd.Flags().StringVar(&deployFee, "fee", "", "Transaction fee in drops")
 }
 
 func runDeploy(cmd *cobra.Command, args []string) error {
@@ -63,7 +80,7 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		if deployNetwork == "local" {
 			networkCfg = config.NetworkConfig{
 				URL:       "ws://localhost:6006",
-				NetworkID: 0, // Local network uses network ID 0
+				NetworkID: 63456,
 				FaucetURL: "http://localhost:8080/faucet",
 			}
 		} else {
@@ -200,12 +217,21 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 	// Deploy contract
 	ctx := cmd.Context()
 	result, err := d.Deploy(ctx, deployer.DeploymentConfig{
-		WasmPath:   wasmPath,
-		ABIPath:    abiPath,
-		NetworkURL: networkCfg.URL,
-		WalletSeed: walletSeed,
-		Algorithm:  deployAlgorithm,
-		FaucetURL:  faucetURL,
+		WasmPath:      wasmPath,
+		ABIPath:       abiPath,
+		NetworkURL:    networkCfg.URL,
+		NetworkID:     networkCfg.NetworkID,
+		WalletSeed:    walletSeed,
+		Algorithm:     deployAlgorithm,
+		FaucetURL:     faucetURL,
+		Fee:           deployFee,
+		Immutable:     deployImmutable,
+		CodeImmutable: deployCodeImmutable,
+		ABIImmutable:  deployABIImmutable,
+		Undeletable:   deployUndeletable,
+		ReuseCode:     deployReuseCode,
+		Params:        deployParams,
+		Owner:         deployOwner,
 	})
 
 	if err != nil {
@@ -232,14 +258,23 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("  Wallet Address: %s\n", result.WalletAddress)
-	fmt.Printf("  Wallet Seed: %s\n", result.WalletSeed)
+	fmt.Printf("  Wallet Seed: %s\n", maskSeed(result.WalletSeed))
 
 	fmt.Println()
 	color.Yellow("💡 Tips:\n")
+	color.Yellow("   • Use --verbose to see the full wallet seed\n")
 	color.Yellow("   • Save the wallet seed to interact with the contract later\n")
 	if result.ContractAccount != "" {
-		color.Yellow("   • Call functions with: bedrock call %s <function-name> --wallet %s\n", result.ContractAccount, result.WalletSeed)
+		color.Yellow("   • Call functions with: bedrock call %s <function-name> --wallet <seed>\n", result.ContractAccount)
 	}
 
 	return nil
+}
+
+// maskSeed masks a wallet seed, showing only the first 4 and last 4 characters
+func maskSeed(seed string) string {
+	if len(seed) <= 8 {
+		return "****"
+	}
+	return seed[:4] + strings.Repeat("*", len(seed)-8) + seed[len(seed)-4:]
 }

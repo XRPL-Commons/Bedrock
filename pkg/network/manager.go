@@ -61,6 +61,17 @@ func (m *Manager) Start(ctx context.Context, opts StartOptions) error {
 		return fmt.Errorf("genesis.json not found in %s", configDir)
 	}
 
+	// Check for xrpld.cfg and validators.txt
+	xrpldCfgPath := filepath.Join(configDir, "xrpld.cfg")
+	if _, err := os.Stat(xrpldCfgPath); os.IsNotExist(err) {
+		return fmt.Errorf("xrpld.cfg not found in %s (run 'bedrock init' to generate)", configDir)
+	}
+
+	validatorsPath := filepath.Join(configDir, "validators.txt")
+	if _, err := os.Stat(validatorsPath); os.IsNotExist(err) {
+		return fmt.Errorf("validators.txt not found in %s (run 'bedrock init' to generate)", configDir)
+	}
+
 	// Configure port bindings
 	portBindings := nat.PortMap{
 		"6006/tcp":  []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "6006"}},
@@ -68,10 +79,12 @@ func (m *Manager) Start(ctx context.Context, opts StartOptions) error {
 		"51235/tcp": []nat.PortBinding{{HostIP: "0.0.0.0", HostPort: "51235"}},
 	}
 
-	// Create container
+	// Create container with entrypoint override for xrpld standalone mode
 	resp, err := m.docker.ContainerCreate(ctx,
 		&container.Config{
-			Image: opts.DockerImage,
+			Image:      opts.DockerImage,
+			Entrypoint: []string{"/app/xrpld"},
+			Cmd:        []string{"-a", "--ledgerfile", "/genesis.json", "--conf", "/opt/ripple/config/xrpld.cfg"},
 			ExposedPorts: nat.PortSet{
 				"6006/tcp":  struct{}{},
 				"5005/tcp":  struct{}{},
@@ -82,6 +95,8 @@ func (m *Manager) Start(ctx context.Context, opts StartOptions) error {
 			PortBindings: portBindings,
 			Binds: []string{
 				fmt.Sprintf("%s:/genesis.json:ro", genesisPath),
+				fmt.Sprintf("%s:/opt/ripple/config/xrpld.cfg:ro", xrpldCfgPath),
+				fmt.Sprintf("%s:/opt/ripple/config/validators.txt:ro", validatorsPath),
 			},
 			AutoRemove: false,
 		},
@@ -187,13 +202,22 @@ func (m *Manager) Close() error {
 func (m *Manager) pullImage(ctx context.Context, imageName string) error {
 	reader, err := m.docker.ImagePull(ctx, imageName, image.PullOptions{})
 	if err != nil {
-		return err
+		// Pull failed - check if the image exists locally (e.g. locally-built arm64 image)
+		if m.imageExistsLocally(ctx, imageName) {
+			return nil
+		}
+		return fmt.Errorf("image %q not found remotely or locally: %w", imageName, err)
 	}
 	defer reader.Close()
 
 	// Read the pull output (required for pull to complete)
 	_, err = io.Copy(io.Discard, reader)
 	return err
+}
+
+func (m *Manager) imageExistsLocally(ctx context.Context, imageName string) bool {
+	_, _, err := m.docker.ImageInspectWithRaw(ctx, imageName)
+	return err == nil
 }
 
 func (m *Manager) getContainer(ctx context.Context) (*types.ContainerJSON, error) {

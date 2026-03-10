@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/Peersyst/xrpl-go/xrpl/rpc"
@@ -171,7 +170,7 @@ func (s *LedgerService) advanceLedger() {
 	}
 
 	s.mu.Lock()
-	atomic.AddUint64(&s.ledgersAdvanced, 1)
+	s.ledgersAdvanced++
 	s.lastLedgerIndex = result.LedgerCurrentIndex
 	s.lastError = ""
 	s.mu.Unlock()

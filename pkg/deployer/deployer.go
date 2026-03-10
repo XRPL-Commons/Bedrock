@@ -34,6 +34,7 @@ func (d *Deployer) Deploy(ctx context.Context, config DeploymentConfig) (*Deploy
 		"wasm_path":   config.WasmPath,
 		"abi_path":    config.ABIPath,
 		"network_url": config.NetworkURL,
+		"network_id":  config.NetworkID,
 		"algorithm":   config.Algorithm,
 		"verbose":     d.verbose,
 	}
@@ -48,6 +49,28 @@ func (d *Deployer) Deploy(ctx context.Context, config DeploymentConfig) (*Deploy
 
 	if config.Fee != "" {
 		jsConfig["fee"] = config.Fee
+	}
+
+	if config.Immutable {
+		jsConfig["immutable"] = true
+	}
+	if config.CodeImmutable {
+		jsConfig["code_immutable"] = true
+	}
+	if config.ABIImmutable {
+		jsConfig["abi_immutable"] = true
+	}
+	if config.Undeletable {
+		jsConfig["undeletable"] = true
+	}
+	if config.ReuseCode != "" {
+		jsConfig["reuse_code"] = config.ReuseCode
+	}
+	if config.Params != "" {
+		jsConfig["params"] = config.Params
+	}
+	if config.Owner != "" {
+		jsConfig["owner"] = config.Owner
 	}
 
 	// Execute deploy.js module

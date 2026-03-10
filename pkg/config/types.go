@@ -1,6 +1,9 @@
 package config
 
-import "time"
+import (
+	"runtime"
+	"time"
+)
 
 // Config represents the bedrock.toml configuration
 type Config struct {
@@ -11,6 +14,9 @@ type Config struct {
 	Deployments map[string]DeploymentInfo `toml:"deployments"`
 	Wallets     WalletsConfig             `toml:"wallets"`
 	LocalNode   LocalNodeConfig           `toml:"local_node"`
+	Test        TestConfig                `toml:"test"`
+	Snapshot    SnapshotConfig            `toml:"snapshot"`
+	Doc         DocConfig                 `toml:"doc"`
 }
 
 type ProjectConfig struct {
@@ -57,11 +63,67 @@ type LocalNodeConfig struct {
 	LedgerInterval int    `toml:"ledger_interval"`
 }
 
-// DefaultLocalNodeConfig returns default local node configuration
+// TestConfig configures the test runner
+type TestConfig struct {
+	FuzzRuns           int    `toml:"fuzz_runs"`
+	FuzzSeed           int64  `toml:"fuzz_seed"`
+	IntegrationNetwork string `toml:"integration_network"`
+	FixturesDir        string `toml:"fixtures_dir"`
+}
+
+// SnapshotConfig configures gas snapshots
+type SnapshotConfig struct {
+	File string `toml:"file"`
+}
+
+// DocConfig configures documentation generation
+type DocConfig struct {
+	Output string `toml:"output"`
+}
+
+const (
+	// DefaultDockerImageAMD64 is the upstream amd64 image from Transia
+	DefaultDockerImageAMD64 = "transia/cluster:f5d78179c9d1fbaf8bff8b77a052e263df90faa1"
+	// DefaultDockerImageARM64 is a locally-built native arm64 image.
+	// Build with: ./docker/build-arm64.sh
+	DefaultDockerImageARM64 = "bedrock-xrpld:arm64-local"
+)
+
+// DefaultLocalNodeConfig returns default local node configuration.
+// On arm64 (Apple Silicon), it defaults to the native arm64 image to avoid
+// WASM execution hangs under Rosetta/QEMU emulation.
 func DefaultLocalNodeConfig() LocalNodeConfig {
+	image := DefaultDockerImageAMD64
+	if runtime.GOARCH == "arm64" {
+		image = DefaultDockerImageARM64
+	}
 	return LocalNodeConfig{
 		ConfigDir:      ".bedrock/node-config",
-		DockerImage:    "transia/alphanet:latest",
+		DockerImage:    image,
 		LedgerInterval: 1000, // 1 second default
+	}
+}
+
+// DefaultTestConfig returns default test configuration
+func DefaultTestConfig() TestConfig {
+	return TestConfig{
+		FuzzRuns:           256,
+		FuzzSeed:           0,
+		IntegrationNetwork: "local",
+		FixturesDir:        "tests/fixtures",
+	}
+}
+
+// DefaultSnapshotConfig returns default snapshot configuration
+func DefaultSnapshotConfig() SnapshotConfig {
+	return SnapshotConfig{
+		File: ".gas-snapshot",
+	}
+}
+
+// DefaultDocConfig returns default documentation configuration
+func DefaultDocConfig() DocConfig {
+	return DocConfig{
+		Output: "docs/api",
 	}
 }
