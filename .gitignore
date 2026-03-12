@@ -1,0 +1,10 @@
+# Dependencies
+docs/node_modules/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+
+# OS files
+.DS_Store
+
+# IDE
+.idea/
