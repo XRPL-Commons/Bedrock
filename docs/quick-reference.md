@@ -1,4 +1,4 @@
-# Bedrock Quick Reference
+# Quick Reference
 
 A quick lookup guide for common Bedrock operations.
 
