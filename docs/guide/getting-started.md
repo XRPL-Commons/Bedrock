@@ -37,8 +37,8 @@ source $HOME/.cargo/env
 
 ```bash
 # Clone the repository
-git clone https://github.com/XRPL-Commons/Bedrock.git
-cd Bedrock
+git clone https://github.com/XRPL-Commons/bedrock.git
+cd bedrock
 
 # Build and install
 go build -o bedrock cmd/bedrock/main.go

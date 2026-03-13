@@ -7,10 +7,10 @@ export default defineConfig({
   description: 'A CLI tool for developing, deploying, and interacting with XRPL smart contracts',
 
   lang: 'en-US',
-  base: '/Bedrock/',
+  base: '/bedrock/',
 
   head: [
-    ['link', { rel: 'icon', type: 'image/png', href: '/Bedrock/favicon.png' }],
+    ['link', { rel: 'icon', type: 'image/png', href: '/bedrock/favicon.png' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
     ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
     [
@@ -37,7 +37,7 @@ export default defineConfig({
       {
         text: 'Links',
         items: [
-          { text: 'GitHub', link: 'https://github.com/XRPL-Commons/Bedrock' },
+          { text: 'GitHub', link: 'https://github.com/XRPL-Commons/bedrock' },
           { text: 'XRPL Commons', link: 'https://www.xrpl-commons.org' },
           { text: 'XRPL Docs', link: 'https://xrpl.org/' },
         ],
@@ -74,7 +74,7 @@ export default defineConfig({
       },
     ],
 
-    socialLinks: [{ icon: 'github', link: 'https://github.com/XRPL-Commons/Bedrock' }],
+    socialLinks: [{ icon: 'github', link: 'https://github.com/XRPL-Commons/bedrock' }],
 
     footer: {
       message: 'Released under the MIT License.',

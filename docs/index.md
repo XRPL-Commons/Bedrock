@@ -101,11 +101,11 @@ Ready to get started? Here's the recommended path:
 
 ## Community & Support
 
-- **GitHub** - [XRPL-Commons/Bedrock](https://github.com/XRPL-Commons/Bedrock)
+- **GitHub** - [XRPL-Commons/Bedrock](https://github.com/XRPL-Commons/bedrock)
 - **Issues** - Report bugs or request features on GitHub
 - **XRPL Commons** - [xrpl-commons.org](https://www.xrpl-commons.org)
 - **XRPL Docs** - [xrpl.org](https://xrpl.org/)
 
 ## License
 
-MIT License - See the [LICENSE](https://github.com/XRPL-Commons/Bedrock/blob/main/LICENSE) file for details.
+MIT License - See the [LICENSE](https://github.com/XRPL-Commons/bedrock/blob/main/LICENSE) file for details.
